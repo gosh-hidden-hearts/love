@@ -32,14 +32,11 @@ export const AuthView = {
                   type="email" 
                   id="auth-email" 
                   class="input-field" 
-                  placeholder="prasanthgokul736@gmail.com" 
+                  placeholder="Enter authorized email" 
                   required 
                   autocomplete="email" 
                   autofocus
                 />
-                <span class="text-xs text-muted" style="margin-top: 2px;">
-                  Pre-configured whitelist: <code>prasanthgokul736@gmail.com</code> or <code>sharanyasiva4@gmail.com</code>
-                </span>
               </div>
 
               <div class="form-group">
@@ -233,7 +230,7 @@ export const AuthView = {
             </p>
             <div class="form-group">
               <label class="form-label" for="reset-email">Authorized Email</label>
-              <input type="email" id="reset-email" class="input-field" placeholder="prasanthgokul736@gmail.com" value="${emailInput.value || ''}" />
+              <input type="email" id="reset-email" class="input-field" placeholder="Enter authorized email" value="${emailInput.value || ''}" />
             </div>
           </div>
         `,
