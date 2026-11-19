@@ -9,11 +9,13 @@ import { Views } from './modules/views.js';
 import { Toast } from './components/toast.js';
 import { Modal } from './components/modal.js';
 import { Icons } from './components/icons.js';
+import { Auth } from './services/auth.service.js';
 
 // Expose core component APIs globally for inline action triggers
 window.Toast = Toast;
 window.Modal = Modal;
 window.GOSHState = State;
+window.Auth = Auth;
 
 class App {
   constructor() {
@@ -141,6 +143,34 @@ class App {
           vaultBtn.style.color = 'var(--accent-secondary)';
           vaultBtn.style.borderColor = 'var(--border-subtle)';
         }
+      }
+    });
+
+    // React to user auth state changes
+    State.subscribe('user', (user) => {
+      const avatarEl = document.getElementById('header-avatar');
+      const appSidebar = document.getElementById('app-sidebar');
+      const bottomNav = document.getElementById('mobile-bottom-nav');
+      const vaultBtn = document.getElementById('header-vault-btn');
+      const notifBtn = document.getElementById('header-notif-btn');
+
+      if (user) {
+        if (avatarEl) {
+          const initials = (user.displayName || 'G').substring(0, 2).toUpperCase();
+          avatarEl.textContent = initials;
+          avatarEl.title = `${user.displayName} (${user.email})`;
+          avatarEl.style.display = 'flex';
+        }
+        if (appSidebar) appSidebar.style.display = 'flex';
+        if (bottomNav) bottomNav.style.display = '';
+        if (vaultBtn) vaultBtn.style.display = 'inline-flex';
+        if (notifBtn) notifBtn.style.display = 'inline-flex';
+      } else {
+        if (avatarEl) avatarEl.style.display = 'none';
+        if (appSidebar) appSidebar.style.display = 'none';
+        if (bottomNav) bottomNav.style.display = 'none';
+        if (vaultBtn) vaultBtn.style.display = 'none';
+        if (notifBtn) notifBtn.style.display = 'none';
       }
     });
 

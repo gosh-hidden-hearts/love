@@ -10,6 +10,7 @@ class ToastManager {
   }
 
   init() {
+    if (typeof document === 'undefined') return;
     if (!this.container) {
       this.container = document.getElementById('toast-container');
       if (!this.container) {
@@ -21,6 +22,10 @@ class ToastManager {
   }
 
   show(type = 'info', title = '', message = '', duration = 4000) {
+    if (typeof document === 'undefined') {
+      console.log(`[TOAST MOCK ${type.toUpperCase()}] ${title}: ${message}`);
+      return null;
+    }
     this.init();
 
     const toast = document.createElement('div');

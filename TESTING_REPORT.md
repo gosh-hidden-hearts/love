@@ -16,3 +16,8 @@
 | **SPA Hash Router** | Routing | `window.location.hash` changes | **PASS** | All 15 routes mounted and verified. |
 | **Reusable UI Components** | UI Library | Component Audit | **PASS** | Modals, Toasts, Skeletons, Empty States, Buttons, Cards. |
 | **State Reactivity** | Reactive Store | `StateStore.subscribe` | **PASS** | Dynamic Vault lock status, online/offline status banner. |
+| **Strict 2-User Whitelist** | Phase 2 Auth Security | `node js/testing/auth.test.js` (Test 1 & 6) | **PASS** | Rejected unauthorized emails immediately; admitted User 1 & User 2. |
+| **Multi-Step Email OTP** | Phase 2 Auth Security | `node js/testing/auth.test.js` (Test 2, 3, 4) | **PASS** | 6-digit OTP verification; invalid OTP rejected; valid OTP mints session. |
+| **Device Fingerprinting** | Phase 2 Auth Security | `node js/testing/auth.test.js` (Test 5) | **PASS** | Device fingerprint recorded; new device security event logged. |
+| **Remote Session Revocation** | Phase 2 Auth Security | `node js/testing/auth.test.js` (Test 7) | **PASS** | Revoke all other devices marked sessions revoked; terminated access. |
+| **Route Security Guard** | Phase 2 SPA Guard | Navigation interception in `router.js` | **PASS** | Unauthenticated routes redirected to `#auth`; auth route redirected to `#home` when logged in. |

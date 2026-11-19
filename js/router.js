@@ -4,6 +4,7 @@
  */
 
 import { State } from './state.js';
+import { Auth } from './services/auth.service.js';
 
 class Router {
   constructor() {
@@ -36,7 +37,21 @@ class Router {
   }
 
   async handleRouting() {
-    const routeName = this.getCurrentRoute();
+    let routeName = this.getCurrentRoute();
+
+    // ROUTE SECURITY GUARD
+    const isAuthed = Auth.isAuthenticated();
+    if (!isAuthed && routeName !== 'auth' && routeName !== 'recovery') {
+      console.log(`[GOSH ROUTER] Unauthenticated access to #${routeName} blocked. Redirecting to #auth.`);
+      window.location.hash = '#auth';
+      return;
+    }
+
+    if (isAuthed && routeName === 'auth') {
+      window.location.hash = '#home';
+      return;
+    }
+
     const handler = this.routes.get(routeName) || this.routes.get('home');
 
     if (!handler) {

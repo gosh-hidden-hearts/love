@@ -1,5 +1,5 @@
 /**
- * GOSH FOUNDATION VIEW MODULES (PHASE 1)
+ * GOSH FOUNDATION VIEW MODULES (PHASE 1 & 2)
  * High-fidelity, responsive UI structures for all 15 platform modules.
  */
 
@@ -7,68 +7,12 @@ import { Icons } from '../components/icons.js';
 import { State } from '../state.js';
 import { Modal } from '../components/modal.js';
 import { Toast } from '../components/toast.js';
+import { AuthView } from './auth/auth.view.js';
+import { Auth } from '../services/auth.service.js';
 
 export const Views = {
-  // 01. AUTHENTICATION VIEW
-  auth: {
-    render: () => `
-      <div style="min-height: calc(100vh - 120px); display: flex; align-items: center; justify-content: center; padding: var(--space-4);">
-        <div class="card" style="width: 100%; max-width: 420px; padding: var(--space-8); box-shadow: var(--shadow-lg);">
-          <div class="text-center" style="margin-bottom: var(--space-6);">
-            <div class="brand-emblem" style="width: 52px; height: 52px; margin: 0 auto var(--space-3); font-size: 1.5rem;">G</div>
-            <h1 class="brand-title" style="font-size: var(--text-xl);">GOSH</h1>
-            <p class="brand-subtitle" style="margin-top: 4px;">Your Space. Your Stories.</p>
-            <div class="badge badge-champagne" style="margin-top: var(--space-3);">
-              Private Digital Platform
-            </div>
-          </div>
-
-          <div id="auth-form-container">
-            <form id="login-form" onsubmit="event.preventDefault();">
-              <div class="form-group">
-                <label class="form-label" for="login-email">Authorized Email</label>
-                <input type="email" id="login-email" class="input-field" placeholder="name@gosh.internal" required autocomplete="email" />
-              </div>
-
-              <div class="form-group">
-                <div class="flex justify-between items-center">
-                  <label class="form-label" for="login-password">Password</label>
-                  <a href="#recovery" class="text-xs text-muted" style="text-decoration: underline;">Forgot?</a>
-                </div>
-                <input type="password" id="login-password" class="input-field" placeholder="••••••••••••" required autocomplete="current-password" />
-              </div>
-
-              <div class="form-group" style="margin-top: var(--space-2);">
-                <label class="flex items-center gap-2 text-sm text-secondary" style="cursor: pointer;">
-                  <input type="checkbox" id="remember-device" checked style="accent-color: var(--accent-primary);" />
-                  <span>Trust this device for 30 days</span>
-                </label>
-              </div>
-
-              <button type="submit" id="login-btn" class="btn btn-primary w-full" style="margin-top: var(--space-4);">
-                <span>Sign In to GOSH</span>
-              </button>
-            </form>
-
-            <div class="text-center" style="margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--border-subtle);">
-              <p class="text-xs text-muted">
-                Authorized Personnel Only • 2 Accounts Permitted<br/>
-                Registration is permanently disabled.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    `,
-    mount: (container) => {
-      const btn = container.querySelector('#login-btn');
-      if (btn) {
-        btn.addEventListener('click', () => {
-          Toast.info('Authentication Simulation', 'Phase 2 will bind this to live Firebase Auth & Supabase RLS.');
-        });
-      }
-    }
-  },
+  // 01. AUTHENTICATION VIEW (PHASE 2 MULTI-STEP FLOW)
+  auth: AuthView,
 
   // 02. HOME DASHBOARD
   home: {
@@ -663,52 +607,131 @@ export const Views = {
     mount: () => {}
   },
 
-  // 13. DEVICE MANAGER
+  // 13. DEVICE MANAGER (PHASE 2 LIVE DATA & REVOCATION)
   devices: {
-    render: () => `
-      <div class="view-container">
-        <div class="card flex justify-between items-center" style="margin-bottom: var(--space-6);">
-          <div>
-            <h1 class="card-title" style="font-size: var(--text-xl);">GOSH Device Manager</h1>
-            <p class="text-muted">Active sessions, device security, and remote session revocation.</p>
-          </div>
-          <button class="btn btn-danger" onclick="window.Modal.confirm({ title: 'Revoke Sessions', message: 'Do you want to log out all other devices immediately?', isDanger: true })">
-            Revoke All Other Devices
-          </button>
-        </div>
+    render: () => {
+      const devices = Auth.getRegisteredDevices();
+      const currentDeviceId = Auth.deviceId;
+      const securityEvents = Auth.getSecurityEvents();
 
-        <div class="card">
-          <div class="card-header">
-            <h2 class="card-title">Authorized Devices</h2>
-            <span class="badge badge-success">2 Active</span>
-          </div>
-          <div class="flex flex-col gap-3">
-            <div class="card flex justify-between items-center" style="padding: 14px 18px; background: var(--bg-surface-hover);">
-              <div class="flex items-center gap-3">
-                <div style="color: var(--color-success);">${Icons.devices}</div>
-                <div>
-                  <div class="text-sm font-semibold">Chrome on Windows (Current Device)</div>
-                  <div class="text-xs text-muted">IP Hash: e4a19b... • Active Now</div>
-                </div>
-              </div>
-              <span class="badge badge-success">This Device</span>
+      return `
+        <div class="view-container">
+          <div class="card flex justify-between items-center" style="margin-bottom: var(--space-6);">
+            <div>
+              <h1 class="card-title" style="font-size: var(--text-xl);">GOSH Device Manager</h1>
+              <p class="text-muted">Active sessions, device security, and remote session revocation.</p>
             </div>
+            <button class="btn btn-danger" id="revoke-all-btn">
+              Revoke All Other Devices
+            </button>
+          </div>
 
-            <div class="card flex justify-between items-center" style="padding: 14px 18px; background: var(--bg-surface-hover);">
-              <div class="flex items-center gap-3">
-                <div style="color: var(--accent-primary);">${Icons.devices}</div>
-                <div>
-                  <div class="text-sm font-semibold">Capacitor Android Shell (User 2)</div>
-                  <div class="text-xs text-muted">Android 14 • Last active 12m ago</div>
-                </div>
-              </div>
-              <button class="btn btn-danger btn-sm" onclick="window.Toast.info('Device Revocation', 'Phase 10 will enforce remote token revocation.')">Revoke</button>
+          <!-- Active Devices List -->
+          <div class="card" style="margin-bottom: var(--space-6);">
+            <div class="card-header">
+              <h2 class="card-title">Registered & Active Devices</h2>
+              <span class="badge badge-success">${devices.filter(d => !d.revoked).length} Active</span>
+            </div>
+            <div class="flex flex-col gap-3" id="devices-list-container">
+              ${devices.length === 0 ? `
+                <div class="text-xs text-muted" style="padding: 12px;">No active devices recorded.</div>
+              ` : devices.map(d => {
+                const isCurrent = d.deviceId === currentDeviceId;
+                return `
+                  <div class="card flex justify-between items-center" style="padding: 14px 18px; background: var(--bg-surface-hover); ${d.revoked ? 'opacity: 0.5;' : ''}">
+                    <div class="flex items-center gap-3">
+                      <div style="color: ${d.revoked ? 'var(--text-subtle)' : isCurrent ? 'var(--color-success)' : 'var(--accent-primary)'};">
+                        ${Icons.devices}
+                      </div>
+                      <div>
+                        <div class="text-sm font-semibold flex items-center gap-2">
+                          <span>${d.deviceName || 'Device'}</span>
+                          ${d.revoked ? `<span class="badge badge-danger">Revoked</span>` : ''}
+                        </div>
+                        <div class="text-xs text-muted">
+                          ID: ${d.deviceId.substring(0, 14)}... • Last Active: ${new Date(d.lastActiveAt).toLocaleTimeString()}
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      ${isCurrent ? `
+                        <span class="badge badge-success">This Device</span>
+                      ` : d.revoked ? `
+                        <span class="text-xs text-muted">Terminated</span>
+                      ` : `
+                        <button class="btn btn-danger btn-sm revoke-device-btn" data-device-id="${d.deviceId}">
+                          Revoke
+                        </button>
+                      `}
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+
+          <!-- Security Audit Events -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">Security & Audit Event Log</h2>
+              <span class="badge badge-violet">${securityEvents.length} Events</span>
+            </div>
+            <div class="flex flex-col gap-2" style="max-height: 320px; overflow-y: auto;">
+              ${securityEvents.length === 0 ? `
+                <div class="text-xs text-muted">No security events logged yet.</div>
+              ` : securityEvents.map(evt => {
+                const isCrit = evt.severity === 'CRITICAL';
+                const isWarn = evt.severity === 'WARNING';
+                const badgeClass = isCrit ? 'badge-danger' : isWarn ? 'badge-warning' : 'badge-champagne';
+                return `
+                  <div class="flex items-center justify-between" style="padding: 8px 12px; background: var(--bg-surface-hover); border-radius: var(--radius-sm); font-size: var(--text-xs);">
+                    <div class="flex items-center gap-2">
+                      <span class="badge ${badgeClass}">${evt.eventType}</span>
+                      <span class="text-muted">${evt.details?.email || ''}</span>
+                    </div>
+                    <span class="text-subtle">${new Date(evt.timestamp).toLocaleString()}</span>
+                  </div>
+                `;
+              }).join('')}
             </div>
           </div>
         </div>
-      </div>
-    `,
-    mount: () => {}
+      `;
+    },
+    mount: (container) => {
+      const revokeAllBtn = container.querySelector('#revoke-all-btn');
+      if (revokeAllBtn) {
+        revokeAllBtn.addEventListener('click', () => {
+          Modal.confirm({
+            title: 'Revoke All Other Devices',
+            message: 'Are you sure? All other active sessions on other phones and computers will be terminated immediately.',
+            isDanger: true,
+            confirmText: 'Revoke All',
+            onConfirm: () => {
+              Auth.revokeAllOtherDevices();
+              AppRouter.handleRouting();
+            }
+          });
+        });
+      }
+
+      container.querySelectorAll('.revoke-device-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const devId = btn.getAttribute('data-device-id');
+          Modal.confirm({
+            title: 'Revoke Device',
+            message: 'Are you sure you want to terminate this device session?',
+            isDanger: true,
+            confirmText: 'Revoke',
+            onConfirm: () => {
+              Auth.revokeDevice(devId);
+              Toast.warning('Device Revoked', 'Session was permanently terminated.');
+              AppRouter.handleRouting();
+            }
+          });
+        });
+      });
+    }
   },
 
   // 14. RECOVERY CENTER
@@ -757,61 +780,84 @@ export const Views = {
 
   // 15. SETTINGS & PROFILE
   settings: {
-    render: () => `
-      <div class="view-container">
-        <div class="card" style="margin-bottom: var(--space-6);">
-          <div class="card-header">
-            <h1 class="card-title" style="font-size: var(--text-xl);">Settings & Preferences</h1>
-            <span class="badge badge-violet">Profile</span>
-          </div>
-          <div class="flex items-center gap-4">
-            <div class="user-avatar-badge" style="width: 56px; height: 56px; font-size: 1.25rem;">
-              U1
+    render: () => {
+      const user = Auth.getCurrentUser() || {
+        displayName: 'Authorized User',
+        email: 'user1@gosh.internal',
+        role: 'owner'
+      };
+      const initials = (user.displayName || 'G').substring(0, 2).toUpperCase();
+
+      return `
+        <div class="view-container">
+          <div class="card" style="margin-bottom: var(--space-6);">
+            <div class="card-header">
+              <h1 class="card-title" style="font-size: var(--text-xl);">Settings & Preferences</h1>
+              <span class="badge badge-violet">Profile</span>
             </div>
-            <div>
-              <div class="text-md font-semibold">User 1 (Authorized Identity)</div>
-              <div class="text-xs text-muted">user1@gosh.internal • Primary Session</div>
+            <div class="flex items-center gap-4">
+              <div class="user-avatar-badge" style="width: 56px; height: 56px; font-size: 1.25rem; background: var(--accent-primary-muted); border-color: var(--accent-primary); color: var(--accent-primary);">
+                ${initials}
+              </div>
+              <div>
+                <div class="text-md font-semibold">${user.displayName} (Authorized Identity)</div>
+                <div class="text-xs text-muted">${user.email} • Role: ${user.role}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">Security & Privacy</h2>
+            </div>
+            <div class="flex flex-col gap-4">
+              <div class="flex justify-between items-center">
+                <div>
+                  <div class="text-sm font-semibold">Vault Auto-Lock Timeout</div>
+                  <div class="text-xs text-muted">Automatically lock the encryption key after inactivity</div>
+                </div>
+                <select class="input-field" style="width: auto;">
+                  <option value="1">1 Minute</option>
+                  <option value="5" selected>5 Minutes</option>
+                  <option value="15">15 Minutes</option>
+                  <option value="0">Immediate on blur</option>
+                </select>
+              </div>
+
+              <div class="flex justify-between items-center" style="padding-top: var(--space-3); border-top: 1px solid var(--border-subtle);">
+                <div>
+                  <div class="text-sm font-semibold">Application Theme</div>
+                  <div class="text-xs text-muted">Graphite & Charcoal Dark Palette</div>
+                </div>
+                <span class="badge badge-champagne">Dark Mode Default</span>
+              </div>
+
+              <div class="flex justify-between items-center" style="padding-top: var(--space-3); border-top: 1px solid var(--border-subtle);">
+                <div>
+                  <div class="text-sm font-semibold">Sign Out Current Session</div>
+                  <div class="text-xs text-muted">Clears local session tokens and locks vault</div>
+                </div>
+                <button class="btn btn-danger btn-sm" id="settings-logout-btn">Sign Out</button>
+              </div>
             </div>
           </div>
         </div>
-
-        <div class="card">
-          <div class="card-header">
-            <h2 class="card-title">Security & Privacy</h2>
-          </div>
-          <div class="flex flex-col gap-4">
-            <div class="flex justify-between items-center">
-              <div>
-                <div class="text-sm font-semibold">Vault Auto-Lock Timeout</div>
-                <div class="text-xs text-muted">Automatically lock the encryption key after inactivity</div>
-              </div>
-              <select class="input-field" style="width: auto;">
-                <option value="1">1 Minute</option>
-                <option value="5" selected>5 Minutes</option>
-                <option value="15">15 Minutes</option>
-                <option value="0">Immediate on blur</option>
-              </select>
-            </div>
-
-            <div class="flex justify-between items-center" style="padding-top: var(--space-3); border-top: 1px solid var(--border-subtle);">
-              <div>
-                <div class="text-sm font-semibold">Application Theme</div>
-                <div class="text-xs text-muted">Graphite & Charcoal Dark Palette</div>
-              </div>
-              <span class="badge badge-champagne">Dark Mode Default</span>
-            </div>
-
-            <div class="flex justify-between items-center" style="padding-top: var(--space-3); border-top: 1px solid var(--border-subtle);">
-              <div>
-                <div class="text-sm font-semibold">Sign Out Current Session</div>
-                <div class="text-xs text-muted">Clears local session tokens and locks vault</div>
-              </div>
-              <button class="btn btn-danger btn-sm" onclick="window.location.hash='#auth'">Sign Out</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    `,
-    mount: () => {}
+      `;
+    },
+    mount: (container) => {
+      const logoutBtn = container.querySelector('#settings-logout-btn');
+      if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+          Modal.confirm({
+            title: 'Sign Out',
+            message: 'Are you sure you want to sign out from this device?',
+            confirmText: 'Sign Out',
+            onConfirm: () => {
+              Auth.logout();
+            }
+          });
+        });
+      }
+    }
   }
 };
