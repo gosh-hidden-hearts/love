@@ -45,8 +45,30 @@
   - Executed automated database & RLS test suite (`js/testing/db.test.js`) verifying 16/16 test assertions passed.
   - Status: **COMPLETED**
 
-- [ ] **PHASE 4 — Dashboard & Telemetry**
-- [ ] **PHASE 4 — Dashboard & Telemetry**
+- [x] **PHASE 4 — GOSH Home Dashboard & Telemetry**
+  - Implemented live dashboard controller (`js/modules/dashboard/dashboard.module.js`) eliminating all placeholder/fake statistics.
+  - Implemented real storage telemetry calculation aggregating actual file sizes against the 20 GB MEGA free tier quota.
+  - Implemented real-time vault credential counter and dynamic lock status indicator.
+  - Implemented upcoming moments feed consuming real `calendar_events` and pending `shared_tasks`.
+  - Implemented unified live activity stream merging file uploads and security events chronologically.
+  - Enhanced top notification center with real-time modal feed from `security_events`.
+  - Implemented reactive subscription listeners automatically refreshing dashboard metrics on DB changes.
+  - Executed automated test suite (`js/testing/dashboard.test.js`) verifying 18/18 test assertions passed.
+  - Status: **COMPLETED**
+
+- [ ] **PHASE 5 — GOSH Connect (Messaging)**
+- [x] **PHASE 4 — GOSH Home Dashboard & Telemetry**
+  - Implemented live dashboard controller (`js/modules/dashboard/dashboard.module.js`) eliminating all placeholder/fake statistics.
+  - Implemented real storage telemetry calculation aggregating actual file sizes against the 20 GB MEGA free tier quota.
+  - Implemented real-time vault credential counter and dynamic lock status indicator.
+  - Implemented upcoming moments feed consuming real `calendar_events` and pending `shared_tasks`.
+  - Implemented unified live activity stream merging file uploads and security events chronologically.
+  - Enhanced top notification center with real-time modal feed from `security_events`.
+  - Implemented reactive subscription listeners automatically refreshing dashboard metrics on DB changes.
+  - Executed automated test suite (`js/testing/dashboard.test.js`) verifying 18/18 test assertions passed.
+  - Status: **COMPLETED**
+
+- [ ] **PHASE 5 — GOSH Connect (Messaging)**
 - [ ] **PHASE 5 — GOSH Connect (Messaging)**
 - [ ] **PHASE 6 — GOSH Cloud (MEGA Integration)**
 - [ ] **PHASE 7 — GOSH Vault & Document Locker**

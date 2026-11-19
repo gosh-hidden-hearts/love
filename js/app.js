@@ -100,24 +100,37 @@ class App {
     // Notification center button
     if (notifBtn) {
       notifBtn.addEventListener('click', () => {
+        const events = Auth.getSecurityEvents();
         Modal.open({
           title: 'Notification Center',
           content: `
-            <div class="flex flex-col gap-3">
-              <div class="flex items-center gap-3" style="padding: 10px; background: var(--bg-surface-hover); border-radius: var(--radius-md);">
-                <div style="color: var(--color-success);">${Icons.devices}</div>
-                <div>
-                  <div class="text-sm font-semibold">Device Paired</div>
-                  <div class="text-xs text-muted">User 2 authorized device active • 12m ago</div>
+            <div class="flex flex-col gap-3" style="max-height: 380px; overflow-y: auto;">
+              ${events.length === 0 ? `
+                <div class="empty-state" style="padding: 24px;">
+                  <div class="empty-state-icon" style="width: 38px; height: 38px;">${Icons.bell}</div>
+                  <p class="text-xs text-muted">No unread notifications.</p>
                 </div>
-              </div>
-              <div class="flex items-center gap-3" style="padding: 10px; background: var(--bg-surface-hover); border-radius: var(--radius-md);">
-                <div style="color: var(--accent-primary);">${Icons.cloud}</div>
-                <div>
-                  <div class="text-sm font-semibold">Storage Health Check</div>
-                  <div class="text-xs text-muted">MEGA 20 GB free tier verified active • 1h ago</div>
-                </div>
-              </div>
+              ` : events.map(e => {
+                const isCrit = e.severity === 'CRITICAL';
+                const isWarn = e.severity === 'WARNING';
+                const color = isCrit ? 'var(--color-danger)' : isWarn ? 'var(--color-warning)' : 'var(--color-success)';
+                const icon = isCrit || isWarn ? Icons.alert : Icons.info;
+                return `
+                  <div class="flex items-center gap-3" style="padding: 10px 14px; background: var(--bg-surface-hover); border-radius: var(--radius-md); border-left: 3px solid ${color};">
+                    <div style="color: ${color}; flex-shrink: 0;">${icon}</div>
+                    <div class="flex-1 truncate">
+                      <div class="text-sm font-semibold truncate">${e.eventType.replace(/_/g, ' ')}</div>
+                      <div class="text-xs text-muted">${e.details?.email || 'System'} • ${new Date(e.timestamp).toLocaleTimeString()}</div>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `,
+          footer: `
+            <div class="flex justify-between items-center w-full">
+              <span class="text-xs text-muted">${events.length} system notifications</span>
+              <button class="btn btn-secondary btn-sm" onclick="window.Modal.close(this.closest('.modal-backdrop'))">Close</button>
             </div>
           `
         });

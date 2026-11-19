@@ -26,3 +26,7 @@
 | **Database Security Gate** | Phase 3 Auth Gate | `node js/testing/db.test.js` (Test 1) | **PASS** | Unauthenticated queries strictly rejected with Access Denied. |
 | **Database Seed Integrity** | Phase 3 Seed Data | `node js/testing/db.test.js` (Test 2) | **PASS** | Initial room, cloud folders, and playlists verified. |
 | **CRUD & Realtime Sync** | Phase 3 Operations | `node js/testing/db.test.js` (Test 3, 4, 5, 6) | **PASS** | Insert, query by filter, update, realtime subscription, and delete verified. |
+| **Storage Telemetry Calculation** | Phase 4 Dashboard | `node js/testing/dashboard.test.js` (Test 1 & 4) | **PASS** | Byte formatting accurate; exact MEGA 20 GB usage and percentage computed. |
+| **Time & Greeting Utilities** | Phase 4 Dashboard | `node js/testing/dashboard.test.js` (Test 2 & 3) | **PASS** | Localized time greetings and humanized "time ago" verified. |
+| **Live Data Aggregation** | Phase 4 Dashboard | `node js/testing/dashboard.test.js` (Test 4) | **PASS** | Aggregated real data across `files`, `vault_items`, `calendar_events`, and `security_events`. |
+| **Dashboard Reactive Lifecycle** | Phase 4 Dashboard | `node js/testing/dashboard.test.js` (Test 5) | **PASS** | Auto-refresh listeners registered on mount and cleaned up on unmount. |
