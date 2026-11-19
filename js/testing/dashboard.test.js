@@ -75,7 +75,7 @@ async function runDashboardTests() {
   assert(['Good morning', 'Good afternoon', 'Good evening'].includes(greeting), 'TEST 3: Valid localized time greeting generated');
 
   // Setup: Authenticate User 1
-  const loginResult = await Auth.initiateLogin('user1@gosh.internal', 'securepassword123');
+  const loginResult = await Auth.initiateLogin('prasanthgokul736@gmail.com', 'Gokul@709');
   await Auth.verifyOtp(loginResult.debugCode);
   assert(Auth.isAuthenticated(), 'Setup: Authenticated as User 1');
 

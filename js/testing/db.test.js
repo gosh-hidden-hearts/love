@@ -68,7 +68,7 @@ async function runDatabaseTests() {
   }
 
   // Authenticate as User 1
-  const loginResult = await Auth.initiateLogin('user1@gosh.internal', 'securepassword123');
+  const loginResult = await Auth.initiateLogin('prasanthgokul736@gmail.com', 'Gokul@709');
   await Auth.verifyOtp(loginResult.debugCode);
   assert(Auth.isAuthenticated(), 'Setup: Successfully authenticated as User 1');
 

@@ -67,7 +67,7 @@ async function runRecoveryTests() {
     // 0. Setup: Authenticate User 1
     localStorage.clear();
     DB.initDefaultSeed();
-    const loginRes = await Auth.initiateLogin('user1@gosh.internal', 'securepassword123');
+    const loginRes = await Auth.initiateLogin('prasanthgokul736@gmail.com', 'Gokul@709');
     await Auth.verifyOtp(loginRes.debugCode);
     assert(Auth.isAuthenticated(), 'Setup: Authenticated as User 1');
 
@@ -216,6 +216,7 @@ async function runRecoveryTests() {
 
     console.log(`\nPHASE 10 TESTS COMPLETED: ${passed} passed, ${failed} failed`);
     if (failed > 0) process.exit(1);
+    process.exit(0);
 
   } catch (err) {
     console.error('Test Suite Exception:', err);

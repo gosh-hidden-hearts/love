@@ -77,29 +77,29 @@ async function runE2EVerification() {
     // AUDIT 01: GOSH AUTHENTICATION & IDENTITY
     // =========================================================================
     // Whitelist check
-    assert(Auth.isEmailAuthorized('user1@gosh.internal') !== null, 'MODULE 01: Whitelisted User 1 authorized');
-    assert(Auth.isEmailAuthorized('user2@gosh.internal') !== null, 'MODULE 01: Whitelisted User 2 authorized');
+    assert(Auth.isEmailAuthorized('prasanthgokul736@gmail.com') !== null, 'MODULE 01: Whitelisted User 1 authorized');
+    assert(Auth.isEmailAuthorized('sharanyasiva4@gmail.com') !== null, 'MODULE 01: Whitelisted User 2 authorized');
     assert(Auth.isEmailAuthorized('attacker@outside.com') === null, 'MODULE 01: Third-party email strictly rejected');
 
     // Multi-step OTP Login
-    const loginRes = await Auth.initiateLogin('user1@gosh.internal', 'securepassword123');
+    const loginRes = await Auth.initiateLogin('prasanthgokul736@gmail.com', 'Gokul@709');
     await Auth.verifyOtp(loginRes.debugCode);
     const currentUser = Auth.getCurrentUser();
     assert(Auth.isAuthenticated(), 'MODULE 01: Authenticated with 6-digit Email OTP');
-    assert(currentUser.email === 'user1@gosh.internal', 'MODULE 01: Current user is Alex');
+    assert(currentUser.email === 'prasanthgokul736@gmail.com', 'MODULE 01: Current user is Gokul');
 
     // =========================================================================
     // AUDIT 02: GOSH HOME DASHBOARD
     // =========================================================================
     const homeHtml = await Views.home.render();
-    assert(homeHtml.includes('Alex') || homeHtml.includes('Dashboard'), 'MODULE 02: Dashboard renders welcome header');
+    assert(homeHtml.includes('Gokul') || homeHtml.includes('Dashboard'), 'MODULE 02: Dashboard renders welcome header');
     assert(homeHtml.includes('20.0 GB'), 'MODULE 02: Accurately reflects 20 GB MEGA quota');
     assert(homeHtml.includes('Recent Activity') || homeHtml.includes('Activity Stream'), 'MODULE 02: Activity stream integrated');
 
     // =========================================================================
     // AUDIT 03: GOSH CONNECT
     // =========================================================================
-    const plainMsg = 'E2E private message between Alex and Sam';
+    const plainMsg = 'E2E private message between Gokul and Sharanya';
     const encMsg = await Crypto.encrypt(plainMsg);
     assert(encMsg.ciphertext !== plainMsg && encMsg.iv.length === 24, 'MODULE 03: Web Crypto AES-256-GCM ciphering active');
     const decMsg = await Crypto.decrypt(encMsg.ciphertext, encMsg.iv);

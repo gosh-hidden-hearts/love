@@ -111,7 +111,7 @@ export const DiaryModule = {
           <div class="flex flex-col gap-4">
             ${filtered.map(entry => {
               const moodMeta = this.moods.find(m => m.id === entry.mood) || { label: '🌿 Peaceful', color: '#10b981' };
-              const authorName = entry.created_by === 'u1-auth-0000-0000-000000000001' ? 'Alex' : 'Sam';
+              const authorName = entry.created_by === 'u1-auth-0000-0000-000000000001' ? 'Gokul' : 'Sharanya';
 
               return `
                 <div class="card" style="padding: var(--space-5); border-left: 4px solid ${moodMeta.color};">

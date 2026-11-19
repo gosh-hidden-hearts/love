@@ -48,7 +48,7 @@ export const DashboardModule = {
   },
 
   async render() {
-    const user = Auth.getCurrentUser() || { displayName: 'Authorized User', email: 'user1@gosh.internal' };
+    const user = Auth.getCurrentUser() || { displayName: 'Gokul', email: 'prasanthgokul736@gmail.com' };
     const greeting = this.getTimeGreeting();
 
     // 1. Fetch Real Application Data

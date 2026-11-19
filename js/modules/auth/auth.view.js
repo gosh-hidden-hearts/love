@@ -32,13 +32,13 @@ export const AuthView = {
                   type="email" 
                   id="auth-email" 
                   class="input-field" 
-                  placeholder="user1@gosh.internal" 
+                  placeholder="prasanthgokul736@gmail.com" 
                   required 
                   autocomplete="email" 
                   autofocus
                 />
                 <span class="text-xs text-muted" style="margin-top: 2px;">
-                  Pre-configured whitelist: <code>user1@gosh.internal</code> or <code>user2@gosh.internal</code>
+                  Pre-configured whitelist: <code>prasanthgokul736@gmail.com</code> or <code>sharanyasiva4@gmail.com</code>
                 </span>
               </div>
 
@@ -215,7 +215,7 @@ export const AuthView = {
     // Step 2 Resend Code
     resendBtn.addEventListener('click', async () => {
       try {
-        const result = await Auth.initiateLogin(currentEmail, passInput.value || 'goshpassword', rememberBox.checked);
+        const result = await Auth.initiateLogin(currentEmail, passInput.value || 'Gokul@709', rememberBox.checked);
         Toast.info('New OTP Sent', `Code: ${result.debugCode}`);
       } catch (err) {
         Toast.error('Resend Failed', err.message);
@@ -233,7 +233,7 @@ export const AuthView = {
             </p>
             <div class="form-group">
               <label class="form-label" for="reset-email">Authorized Email</label>
-              <input type="email" id="reset-email" class="input-field" placeholder="user1@gosh.internal" value="${emailInput.value || ''}" />
+              <input type="email" id="reset-email" class="input-field" placeholder="prasanthgokul736@gmail.com" value="${emailInput.value || ''}" />
             </div>
           </div>
         `,

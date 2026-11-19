@@ -61,7 +61,7 @@ async function runVaultTests() {
   }
 
   // Setup: Authenticate User 1
-  const loginResult = await Auth.initiateLogin('user1@gosh.internal', 'securepassword123');
+  const loginResult = await Auth.initiateLogin('prasanthgokul736@gmail.com', 'Gokul@709');
   await Auth.verifyOtp(loginResult.debugCode);
   assert(Auth.isAuthenticated(), 'Setup: Authenticated as User 1');
 
@@ -154,7 +154,7 @@ async function runVaultTests() {
 
   const docRecord = await DB.insert('documents', {
     file_id: mockFile.id,
-    title: 'Alex National Passport',
+    title: 'Gokul National Passport',
     category: 'identity',
     notes: 'Valid until 2034',
     is_confidential: true

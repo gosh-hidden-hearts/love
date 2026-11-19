@@ -7,8 +7,8 @@
 -- 1. Pre-provision the two authorized user identities
 INSERT INTO public.authorized_users (id, email, display_name, role)
 VALUES 
-    ('u1-auth-0000-0000-000000000001', 'user1@gosh.internal', 'Alex', 'owner'),
-    ('u2-auth-0000-0000-000000000002', 'user2@gosh.internal', 'Sam', 'owner')
+    ('u1-auth-0000-0000-000000000001', 'prasanthgokul736@gmail.com', 'Gokul', 'owner'),
+    ('u2-auth-0000-0000-000000000002', 'sharanyasiva4@gmail.com', 'Sharanya', 'owner')
 ON CONFLICT (email) DO UPDATE 
 SET display_name = EXCLUDED.display_name, last_seen = timezone('utc', now());
 

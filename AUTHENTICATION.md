@@ -4,7 +4,9 @@
 
 ## 1. Identity Rules & Whitelist
 
-- **Authorized Accounts:** Exactly 2 pre-provisioned user emails.
+- **Authorized Accounts:** Exactly 2 pre-provisioned user identities:
+  - **User 1:** `prasanthgokul736@gmail.com` (Display Name: `Gokul`, Role: `owner`)
+  - **User 2:** `sharanyasiva4@gmail.com` (Display Name: `Sharanya`, Role: `owner`)
 - **Registration Policy:** Public registration is disabled. Attempting to sign up returns an access rejection.
 - **Credential Storage:** Firebase Authentication manages password salting and hashing (Argon2 / scrypt). No raw passwords touch application databases.
 

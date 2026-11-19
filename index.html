@@ -12,6 +12,17 @@
   <!-- PWA Manifest & App Icons -->
   <link rel="manifest" href="manifest.json" />
 
+  <!-- Firebase JavaScript SDK Modular Imports (Zero-Build CDN) -->
+  <script type="importmap">
+    {
+      "imports": {
+        "firebase/app": "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js",
+        "firebase/analytics": "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"
+      }
+    }
+  </script>
+
   <!-- Preload Stylesheets -->
   <link rel="stylesheet" href="css/variables.css" />
   <link rel="stylesheet" href="css/base.css" />

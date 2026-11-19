@@ -69,10 +69,10 @@ async function runLifestyleTests() {
     // 0. Setup: Authenticate as User 1
     localStorage.clear();
     DB.initDefaultSeed();
-    const loginRes = await Auth.initiateLogin('user1@gosh.internal', 'securepassword123');
+    const loginRes = await Auth.initiateLogin('prasanthgokul736@gmail.com', 'Gokul@709');
     await Auth.verifyOtp(loginRes.debugCode);
     const currentUser = Auth.getCurrentUser();
-    assert(Auth.isAuthenticated() && currentUser.email === 'user1@gosh.internal', 'Setup: Authenticated as User 1');
+    assert(Auth.isAuthenticated() && currentUser.email === 'prasanthgokul736@gmail.com', 'Setup: Authenticated as User 1');
 
     // =========================================================================
     // 1. MEMORIES MODULE TESTS
@@ -188,7 +188,7 @@ async function runLifestyleTests() {
       amount: 400.00,
       currency: 'USD',
       category: 'travel',
-      paid_by: 'u1-auth-0000-0000-000000000001', // Alex
+      paid_by: 'u1-auth-0000-0000-000000000001', // Gokul
       expense_date: '2026-11-19',
       split_ratio: '50/50'
     });
@@ -198,22 +198,22 @@ async function runLifestyleTests() {
       amount: 100.00,
       currency: 'USD',
       category: 'travel',
-      paid_by: 'u2-auth-0000-0000-000000000002', // Sam
+      paid_by: 'u2-auth-0000-0000-000000000002', // Sharanya
       expense_date: '2026-11-19',
       split_ratio: '50/50'
     });
 
     assert(expense1 && expense2, 'TOGETHER: Joint expenses recorded in ledger');
 
-    // Settlement verification: Total = 500, Half = 250. Alex paid 400 (overpaid by 150), Sam paid 100. Sam owes Alex $150.
+    // Settlement verification: Total = 500, Half = 250. Gokul paid 400 (overpaid by 150), Sharanya paid 100. Sharanya owes Gokul $150.
     const allExpenses = await DB.query('shared_expenses');
-    let alexTotal = 0, samTotal = 0;
+    let gokulTotal = 0, sharanyaTotal = 0;
     allExpenses.forEach(e => {
-      if (e.paid_by === 'u1-auth-0000-0000-000000000001') alexTotal += parseFloat(e.amount);
-      else samTotal += parseFloat(e.amount);
+      if (e.paid_by === 'u1-auth-0000-0000-000000000001') gokulTotal += parseFloat(e.amount);
+      else sharanyaTotal += parseFloat(e.amount);
     });
-    const netDiff = alexTotal - ((alexTotal + samTotal) / 2);
-    assert(netDiff === 150.00, 'TOGETHER: Net settlement correctly calculates Sam owes Alex $150.00');
+    const netDiff = gokulTotal - ((gokulTotal + sharanyaTotal) / 2);
+    assert(netDiff === 150.00, 'TOGETHER: Net settlement correctly calculates Sharanya owes Gokul $150.00');
 
     // Render Together View
     TogetherModule.activeTab = 'calendar';
@@ -227,7 +227,7 @@ async function runLifestyleTests() {
     TogetherModule.activeTab = 'expenses';
     const expHtml = await TogetherModule.render();
     assert(expHtml.includes('Flight Tickets to Rome'), 'TOGETHER: Expenses tab renders transaction');
-    assert(expHtml.includes('Sam owes Alex $150.00'), 'TOGETHER: Expenses tab displays net settlement calculation');
+    assert(expHtml.includes('Sharanya owes Gokul $150.00'), 'TOGETHER: Expenses tab displays net settlement calculation');
 
     // =========================================================================
     // 4. MUSIC MODULE TESTS

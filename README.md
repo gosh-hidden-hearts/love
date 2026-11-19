@@ -8,7 +8,7 @@ GOSH is a centralized, secure, private digital ecosystem engineered exclusively 
 ## Key Principles & Pillars
 
 1. **Security & Privacy First:** Zero-knowledge architecture. Sensitive credentials, diary notes, and confidential documents are encrypted client-side using the Web Crypto API (`AES-256-GCM` with `PBKDF2-HMAC-SHA256`).
-2. **Strict Two-User Access Control:** Exactly two pre-authorized user identities (`user1@gosh.internal` and `user2@gosh.internal`). No public registration, no guest accounts, no demo credentials.
+2. **Strict Two-User Access Control:** Exactly two pre-authorized user identities (`prasanthgokul736@gmail.com` and `sharanyasiva4@gmail.com`). No public registration, no guest accounts, no demo credentials.
 3. **Verified Zero-Cost Infrastructure:** Powered exclusively by free tiers:
    - **Frontend:** Pure HTML5 / CSS3 / Vanilla JavaScript on GitHub Pages ($0).
    - **Identity:** Multi-step Email OTP and persistent device trust ($0).

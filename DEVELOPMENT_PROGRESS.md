@@ -141,3 +141,13 @@
   - Updated all 14 project documentation files to ensure 100% accuracy, completeness, and consistency.
   - Verified strict zero-cost infrastructure and zero-build Vanilla JS/HTML/CSS architecture.
   - Status: **COMPLETED & PRODUCTION-READY**
+
+- [x] **POST-PHASE 12 — User Credential & Identity Customization**
+  - Updated pre-configured 2-user whitelist in `js/config/firebase.config.js` with customized production identities:
+    - **User 1:** `prasanthgokul736@gmail.com` | Password: `Gokul@709` | Display Name: `Gokul`
+    - **User 2:** `sharanyasiva4@gmail.com` | Password: `Sharanya@2008` | Display Name: `Sharanya`
+  - Updated password verification in `js/services/auth.service.js` enforcing configured credentials.
+  - Updated database seed records in `database/seed.sql` for User 1 and User 2.
+  - Updated UI modules (`auth.view.js`, `dashboard.module.js`, `diary.module.js`, `memories.module.js`, `together.module.js`, `views.js`) with new display names and email hints.
+  - Updated and verified all 11 automated test suites in `js/testing/` with 100% pass rate.
+  - Status: **COMPLETED**

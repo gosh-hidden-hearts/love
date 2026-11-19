@@ -217,7 +217,7 @@ export const TogetherModule = {
     });
 
     const half = totalSpent / 2;
-    const diff = u1Spent - half; // If > 0, Sam owes Alex diff; if < 0, Alex owes Sam |diff|
+    const diff = u1Spent - half; // If > 0, Sharanya owes Gokul diff; if < 0, Gokul owes Sharanya |diff|
 
     return `
       <div>
@@ -232,7 +232,7 @@ export const TogetherModule = {
           </div>
 
           <div class="card" style="padding: var(--space-4);">
-            <div class="text-xs text-muted uppercase font-semibold">Alex Paid</div>
+            <div class="text-xs text-muted uppercase font-semibold">Gokul Paid</div>
             <div style="font-size: var(--text-xl); font-weight: 700; color: var(--accent-primary); margin-top: 4px;">
               $${u1Spent.toFixed(2)}
             </div>
@@ -240,7 +240,7 @@ export const TogetherModule = {
           </div>
 
           <div class="card" style="padding: var(--space-4);">
-            <div class="text-xs text-muted uppercase font-semibold">Sam Paid</div>
+            <div class="text-xs text-muted uppercase font-semibold">Sharanya Paid</div>
             <div style="font-size: var(--text-xl); font-weight: 700; color: #38bdf8; margin-top: 4px;">
               $${u2Spent.toFixed(2)}
             </div>
@@ -250,7 +250,7 @@ export const TogetherModule = {
           <div class="card" style="padding: var(--space-4); border-color: var(--accent-primary);">
             <div class="text-xs text-muted uppercase font-semibold">Net Settlement</div>
             <div style="font-size: var(--text-lg); font-weight: 700; color: var(--color-success); margin-top: 4px;">
-              ${diff === 0 ? 'All Settled Up!' : diff > 0 ? `Sam owes Alex $${diff.toFixed(2)}` : `Alex owes Sam $${Math.abs(diff).toFixed(2)}`}
+              ${diff === 0 ? 'All Settled Up!' : diff > 0 ? `Sharanya owes Gokul $${diff.toFixed(2)}` : `Gokul owes Sharanya $${Math.abs(diff).toFixed(2)}`}
             </div>
             <div class="text-xs text-muted" style="margin-top: 4px;">Calculated automatically</div>
           </div>
@@ -276,7 +276,7 @@ export const TogetherModule = {
                   <div>
                     <div class="text-sm font-semibold" style="color: var(--text-primary);">${this.escapeHtml(exp.title)}</div>
                     <div class="text-xs text-muted">
-                      Paid by <strong>${exp.paid_by === 'u1-auth-0000-0000-000000000001' ? 'Alex' : 'Sam'}</strong> • ${new Date(exp.expense_date).toLocaleDateString()} • <span class="badge badge-champagne text-xs">${exp.category}</span>
+                      Paid by <strong>${exp.paid_by === 'u1-auth-0000-0000-000000000001' ? 'Gokul' : 'Sharanya'}</strong> • ${new Date(exp.expense_date).toLocaleDateString()} • <span class="badge badge-champagne text-xs">${exp.category}</span>
                     </div>
                   </div>
 
@@ -513,8 +513,8 @@ export const TogetherModule = {
               <div style="flex: 1;">
                 <label class="form-label">Paid By</label>
                 <select id="expense-paid-by" class="input-field">
-                  <option value="u1-auth-0000-0000-000000000001" ${currentUserId === 'u1-auth-0000-0000-000000000001' ? 'selected' : ''}>Alex</option>
-                  <option value="u2-auth-0000-0000-000000000002" ${currentUserId === 'u2-auth-0000-0000-000000000002' ? 'selected' : ''}>Sam</option>
+                  <option value="u1-auth-0000-0000-000000000001" ${currentUserId === 'u1-auth-0000-0000-000000000001' ? 'selected' : ''}>Gokul</option>
+                  <option value="u2-auth-0000-0000-000000000002" ${currentUserId === 'u2-auth-0000-0000-000000000002' ? 'selected' : ''}>Sharanya</option>
                 </select>
               </div>
             </div>

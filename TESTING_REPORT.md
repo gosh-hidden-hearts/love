@@ -57,7 +57,7 @@
 | **Encrypted Journal & Moods** | Phase 9 Diary | `node js/testing/lifestyle.test.js` | **PASS** | AES-256-GCM zero-plaintext storage; decrypted in memory; mood filtering verified. |
 | **Calendar Countdowns & Events** | Phase 9 Together | `node js/testing/lifestyle.test.js` | **PASS** | Shared calendar events categorized; countdown badges rendered accurately. |
 | **Collaborative Checklist** | Phase 9 Together | `node js/testing/lifestyle.test.js` | **PASS** | Shared tasks tracked; priority tags verified; real-time completion state synced. |
-| **Shared Expense 50/50 Split** | Phase 9 Together | `node js/testing/lifestyle.test.js` | **PASS** | Joint transactions tracked; net balance calculated (Sam owes Alex $150.00). |
+| **Shared Expense 50/50 Split** | Phase 9 Together | `node js/testing/lifestyle.test.js` | **PASS** | Joint transactions tracked; net balance calculated (Sharanya owes Gokul $150.00). |
 | **Shared Playlists & Audio** | Phase 9 Music | `node js/testing/lifestyle.test.js` | **PASS** | Playlists curated; streaming links tagged; HTML5 audio player state tracked. |
 | **Unified Multi-Module Search** | Phase 9 Smart Search | `node js/testing/lifestyle.test.js` | **PASS** | Real-time search across messages, files, memories, diary, tasks, and expenses. |
 | **BIP-39 Mnemonic Generator** | Phase 10 Disaster Recovery | `node js/testing/recovery.test.js` | **PASS** | 24-word cryptographic seed generated and validated against canonical dictionary. |

@@ -70,8 +70,8 @@ export const Views = {
   settings: {
     render: () => {
       const user = Auth.getCurrentUser() || {
-        displayName: 'Authorized User',
-        email: 'user1@gosh.internal',
+        displayName: 'Gokul',
+        email: 'prasanthgokul736@gmail.com',
         role: 'owner'
       };
       const initials = (user.displayName || 'G').substring(0, 2).toUpperCase();

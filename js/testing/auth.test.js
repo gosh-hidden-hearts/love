@@ -69,10 +69,18 @@ async function runAuthTests() {
     assert(err.message.includes('Access Denied'), 'TEST 1: Unauthorized email is strictly rejected by whitelist');
   }
 
-  // TEST 2: Whitelist Acceptance for User 1
+  // TEST 1B: Password Rejection for User 1
+  try {
+    await Auth.initiateLogin('prasanthgokul736@gmail.com', 'WrongPassword123');
+    assert(false, 'TEST 1B: Incorrect password for User 1 must be rejected');
+  } catch (err) {
+    assert(err.message.includes('Invalid credentials'), 'TEST 1B: Incorrect password for User 1 is rejected');
+  }
+
+  // TEST 2: Whitelist Acceptance for User 1 with exact password Gokul@709
   let step1Result = null;
   try {
-    step1Result = await Auth.initiateLogin('user1@gosh.internal', 'securepassword123');
+    step1Result = await Auth.initiateLogin('prasanthgokul736@gmail.com', 'Gokul@709');
     assert(step1Result.step === 'OTP_REQUIRED', 'TEST 2: Whitelisted User 1 accepted and prompted for OTP');
     assert(step1Result.debugCode && step1Result.debugCode.length === 6, 'TEST 2: 6-digit OTP code generated');
   } catch (err) {
@@ -92,7 +100,8 @@ async function runAuthTests() {
     const session = await Auth.verifyOtp(step1Result.debugCode);
     assert(session && session.userId && session.token, 'TEST 4: Correct OTP mints valid session');
     assert(Auth.isAuthenticated(), 'TEST 4: AuthService reports authenticated');
-    assert(Auth.getCurrentUser().email === 'user1@gosh.internal', 'TEST 4: Current user email is User 1');
+    assert(Auth.getCurrentUser().email === 'prasanthgokul736@gmail.com', 'TEST 4: Current user email is User 1 (prasanthgokul736@gmail.com)');
+    assert(Auth.getCurrentUser().displayName === 'Gokul', 'TEST 4: Current user display name is Gokul');
   } catch (err) {
     assert(false, `TEST 4: Valid OTP verification failed: ${err.message}`);
   }
@@ -106,13 +115,23 @@ async function runAuthTests() {
   assert(securityLogs.some(e => e.eventType === 'SUCCESSFUL_LOGIN'), 'TEST 5: SUCCESSFUL_LOGIN recorded in security audit trail');
   assert(securityLogs.some(e => e.eventType === 'UNAUTHORIZED_LOGIN_ATTEMPT'), 'TEST 5: UNAUTHORIZED_LOGIN_ATTEMPT recorded in audit log');
 
-  // TEST 6: User 2 Whitelist Acceptance
+  // TEST 6: User 2 Whitelist Acceptance & Password Sharanya@2008
   try {
     Auth.logout();
     assert(!Auth.isAuthenticated(), 'TEST 6: Logout successfully clears session');
-    const u2Step1 = await Auth.initiateLogin('user2@gosh.internal', 'anotherpassword123');
+    
+    // Test wrong password for User 2
+    try {
+      await Auth.initiateLogin('sharanyasiva4@gmail.com', 'WrongPass789');
+      assert(false, 'TEST 6: Incorrect password for User 2 must fail');
+    } catch (err) {
+      assert(err.message.includes('Invalid credentials'), 'TEST 6: Wrong password for User 2 rejected');
+    }
+
+    const u2Step1 = await Auth.initiateLogin('sharanyasiva4@gmail.com', 'Sharanya@2008');
     const u2Session = await Auth.verifyOtp(u2Step1.debugCode);
-    assert(u2Session.email === 'user2@gosh.internal', 'TEST 6: Whitelisted User 2 successfully logs in');
+    assert(u2Session.email === 'sharanyasiva4@gmail.com', 'TEST 6: Whitelisted User 2 successfully logs in');
+    assert(u2Session.displayName === 'Sharanya', 'TEST 6: Current user display name is Sharanya');
   } catch (err) {
     assert(false, `TEST 6: User 2 login failed: ${err.message}`);
   }

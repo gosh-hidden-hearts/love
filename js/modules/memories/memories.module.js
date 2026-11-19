@@ -160,7 +160,7 @@ export const MemoriesModule = {
                   ` : ''}
                 </div>
                 <div class="flex justify-between items-center" style="border-top: 1px solid var(--border-subtle); padding-top: var(--space-2); margin-top: var(--space-2);">
-                  <span class="text-xs text-muted">Added by ${item.created_by === 'u1-auth-0000-0000-000000000001' ? 'Alex' : 'Sam'}</span>
+                  <span class="text-xs text-muted">Added by ${item.created_by === 'u1-auth-0000-0000-000000000001' ? 'Gokul' : 'Sharanya'}</span>
                   <button class="btn btn-sm btn-icon delete-memory-btn" data-id="${item.id}" title="Delete Memory" style="color: var(--color-danger); opacity: 0.7;">
                     ${Icons.close}
                   </button>

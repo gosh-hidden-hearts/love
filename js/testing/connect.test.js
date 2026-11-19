@@ -75,10 +75,10 @@ async function runConnectTests() {
   assert(tamperResult.includes('Decryption Failed'), 'TEST 2: Tampered ciphertext rejected by AES-GCM auth tag');
 
   // Setup: Authenticate as User 1
-  const loginResult = await Auth.initiateLogin('user1@gosh.internal', 'securepassword123');
+  const loginResult = await Auth.initiateLogin('prasanthgokul736@gmail.com', 'Gokul@709');
   await Auth.verifyOtp(loginResult.debugCode);
   const currentUser = Auth.getCurrentUser();
-  assert(currentUser && currentUser.email === 'user1@gosh.internal', 'Setup: Authenticated as User 1');
+  assert(currentUser && currentUser.email === 'prasanthgokul736@gmail.com', 'Setup: Authenticated as User 1');
 
   // TEST 3: Insert & Send Encrypted Message
   const msg1Payload = await Crypto.encrypt('Hey, check out the vacation schedule!');

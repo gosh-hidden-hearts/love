@@ -64,7 +64,7 @@ async function runCallsTests() {
   try {
     // 1. Authenticate user
     localStorage.clear();
-    const loginRes = await Auth.initiateLogin('user1@gosh.internal', 'securepassword123');
+    const loginRes = await Auth.initiateLogin('prasanthgokul736@gmail.com', 'Gokul@709');
     await Auth.verifyOtp(loginRes.debugCode);
     assert(Auth.isAuthenticated(), 'User 1 authenticated for WebRTC testing');
 

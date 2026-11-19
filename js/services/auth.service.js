@@ -98,15 +98,16 @@ class AuthService {
 
     // Password verification check
     // In production, this validates via Firebase Auth.
-    // For local baseline, we support standard initial password credentials.
-    const isMockValid = password.length >= 8;
-    if (!isMockValid) {
+    // For local baseline and sovereign operation, we enforce the configured credentials.
+    const expectedPassword = FirebaseConfig.credentials ? FirebaseConfig.credentials[cleanEmail] : null;
+    const isPasswordValid = expectedPassword ? password === expectedPassword : password.length >= 8;
+    if (!isPasswordValid) {
       this.recordFailedAttempt(cleanEmail);
       this.recordSecurityEvent('FAILED_PASSWORD_ATTEMPT', 'WARNING', {
         email: cleanEmail,
         device: this.getDeviceMetadata()
       });
-      throw new Error('Invalid credentials. Passwords must be at least 8 characters.');
+      throw new Error(expectedPassword ? 'Invalid credentials. Password is incorrect.' : 'Invalid credentials. Passwords must be at least 8 characters.');
     }
 
     // Step 1 Success: Generate Email OTP
