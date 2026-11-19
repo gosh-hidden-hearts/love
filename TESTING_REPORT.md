@@ -53,3 +53,10 @@
 | **Media Controls (Mute/Camera)** | Phase 8 WebRTC Media | `node js/testing/calls.test.js` | **PASS** | Audio track mute and video track pause toggle correctly with event notifications. |
 | **Call Timer & Stage Rendering** | Phase 8 WebRTC UI | `node js/testing/calls.test.js` | **PASS** | Timer tracking verified; full screen in-call HUD and lobby rendered. |
 | **Call History DB Persistence** | Phase 8 Database | `node js/testing/calls.test.js` | **PASS** | Call records persisted to `call_history` with caller, receiver, duration, and status. |
+| **Photo Albums & Memories** | Phase 9 Memories | `node js/testing/lifestyle.test.js` | **PASS** | Albums created, photo items tagged, favorites toggled, and timeline rendered. |
+| **Encrypted Journal & Moods** | Phase 9 Diary | `node js/testing/lifestyle.test.js` | **PASS** | AES-256-GCM zero-plaintext storage; decrypted in memory; mood filtering verified. |
+| **Calendar Countdowns & Events** | Phase 9 Together | `node js/testing/lifestyle.test.js` | **PASS** | Shared calendar events categorized; countdown badges rendered accurately. |
+| **Collaborative Checklist** | Phase 9 Together | `node js/testing/lifestyle.test.js` | **PASS** | Shared tasks tracked; priority tags verified; real-time completion state synced. |
+| **Shared Expense 50/50 Split** | Phase 9 Together | `node js/testing/lifestyle.test.js` | **PASS** | Joint transactions tracked; net balance calculated (Sam owes Alex $150.00). |
+| **Shared Playlists & Audio** | Phase 9 Music | `node js/testing/lifestyle.test.js` | **PASS** | Playlists curated; streaming links tagged; HTML5 audio player state tracked. |
+| **Unified Multi-Module Search** | Phase 9 Smart Search | `node js/testing/lifestyle.test.js` | **PASS** | Real-time search across messages, files, memories, diary, tasks, and expenses. |

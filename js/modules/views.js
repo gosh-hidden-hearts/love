@@ -15,6 +15,11 @@ import { CloudModule } from './cloud/cloud.module.js';
 import { VaultModule } from './vault/vault.module.js';
 import { DocumentsModule } from './documents/documents.module.js';
 import { CallsModule } from './calls/calls.module.js';
+import { MemoriesModule } from './memories/memories.module.js';
+import { DiaryModule } from './diary/diary.module.js';
+import { TogetherModule } from './together/together.module.js';
+import { MusicModule } from './music/music.module.js';
+import { SearchModule } from './search/search.module.js';
 
 export const Views = {
   // 01. AUTHENTICATION VIEW (PHASE 2 MULTI-STEP FLOW)
@@ -35,157 +40,23 @@ export const Views = {
   // 06. CLOUD (PHASE 6 MEGA CLOUD STORAGE)
   cloud: CloudModule,
 
-  // 07. MEMORIES
-  memories: {
-    render: () => `
-      <div class="view-container">
-        <div class="card flex justify-between items-center" style="margin-bottom: var(--space-6);">
-          <div>
-            <h1 class="card-title" style="font-size: var(--text-xl);">GOSH Memories</h1>
-            <p class="text-muted">Shared photo albums, milestones, and video timeline.</p>
-          </div>
-          <button class="btn btn-primary" onclick="window.Toast.info('Upload Memory', 'Available in Phase 9.')">
-            + New Memory
-          </button>
-        </div>
+  // 07. MEMORIES (PHASE 9 SHARED PHOTO ALBUMS & MILESTONES)
+  memories: MemoriesModule,
 
-        <div class="card">
-          <div class="empty-state">
-            <div class="empty-state-icon">${Icons.memories}</div>
-            <h3 class="card-title">Your Private Photo Story</h3>
-            <p class="text-muted" style="max-width: 400px; margin-top: 6px;">
-              Photos uploaded here are stored in your dedicated MEGA account and organized into timeline albums.
-            </p>
-          </div>
-        </div>
-      </div>
-    `,
-    mount: () => {}
-  },
+  // 08. DIARY (PHASE 9 ENCRYPTED SHARED JOURNAL & MOOD TAGS)
+  diary: DiaryModule,
 
-  // 08. DIARY
-  diary: {
-    render: () => `
-      <div class="view-container">
-        <div class="card flex justify-between items-center" style="margin-bottom: var(--space-6);">
-          <div>
-            <div class="badge badge-champagne" style="margin-bottom: var(--space-2);">Encrypted Journal</div>
-            <h1 class="card-title" style="font-size: var(--text-xl);">GOSH Diary</h1>
-            <p class="text-muted">Daily shared reflections, thoughts, and memories.</p>
-          </div>
-          <button class="btn btn-primary" onclick="window.Toast.info('New Entry', 'Journaling with mood tags will be implemented in Phase 9.')">
-            + Write Entry
-          </button>
-        </div>
+  // 09. TOGETHER (PHASE 9 CALENDAR, TASKS & SHARED EXPENSES)
+  together: TogetherModule,
 
-        <div class="card">
-          <div class="empty-state">
-            <div class="empty-state-icon">${Icons.diary}</div>
-            <h3 class="card-title">Shared Diary Ready</h3>
-            <p class="text-muted" style="max-width: 400px; margin-top: 6px;">
-              Both authorized users can read, add, and reflect upon journal entries together.
-            </p>
-          </div>
-        </div>
-      </div>
-    `,
-    mount: () => {}
-  },
-
-  // 09. TOGETHER (CALENDAR, TASKS, EXPENSES)
-  together: {
-    render: () => `
-      <div class="view-container">
-        <div class="card flex justify-between items-center" style="margin-bottom: var(--space-6);">
-          <div>
-            <h1 class="card-title" style="font-size: var(--text-xl);">GOSH Together</h1>
-            <p class="text-muted">Shared calendar, countdowns, tasks, and shared expense planner.</p>
-          </div>
-          <div class="flex gap-2">
-            <button class="btn btn-secondary" onclick="window.Toast.info('New Task', 'Available in Phase 9.')">+ Task</button>
-            <button class="btn btn-primary" onclick="window.Toast.info('New Event', 'Available in Phase 9.')">+ Event</button>
-          </div>
-        </div>
-
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--space-6);">
-          <div class="card">
-            <div class="card-header">
-              <h2 class="card-title">Shared Calendar</h2>
-              <span class="badge badge-violet">Monthly</span>
-            </div>
-            <p class="text-sm text-muted">Upcoming trips, anniversaries, and reminders.</p>
-          </div>
-
-          <div class="card">
-            <div class="card-header">
-              <h2 class="card-title">Shared Checklist</h2>
-              <span class="badge badge-champagne">Tasks</span>
-            </div>
-            <p class="text-sm text-muted">Collaborative to-dos with real-time checkbox sync.</p>
-          </div>
-        </div>
-      </div>
-    `,
-    mount: () => {}
-  },
-
-  // 10. MUSIC
-  music: {
-    render: () => `
-      <div class="view-container">
-        <div class="card flex justify-between items-center" style="margin-bottom: var(--space-6);">
-          <div>
-            <h1 class="card-title" style="font-size: var(--text-xl);">GOSH Music</h1>
-            <p class="text-muted">Shared listening library, curated playlists, and favorite tracks.</p>
-          </div>
-          <button class="btn btn-primary" onclick="window.Toast.info('Add Music', 'Link sharing active in Phase 9.')">
-            + Add Song Link
-          </button>
-        </div>
-
-        <div class="card">
-          <div class="empty-state">
-            <div class="empty-state-icon">${Icons.music}</div>
-            <h3 class="card-title">Shared Music Playlists</h3>
-            <p class="text-muted" style="max-width: 420px; margin-top: 6px;">
-              Organize favorite songs, YouTube, and streaming links in one shared music space without copyright liability.
-            </p>
-          </div>
-        </div>
-      </div>
-    `,
-    mount: () => {}
-  },
+  // 10. MUSIC (PHASE 9 SHARED PLAYLISTS & STREAMING LINKS)
+  music: MusicModule,
 
   // 11. DOCUMENT LOCKER (PHASE 7 CONFIDENTIAL CERTIFICATES & DOCS)
   documents: DocumentsModule,
 
-  // 12. SMART SEARCH
-  search: {
-    render: () => `
-      <div class="view-container">
-        <div class="card" style="margin-bottom: var(--space-6);">
-          <div class="card-header">
-            <h1 class="card-title" style="font-size: var(--text-xl);">GOSH Smart Search</h1>
-            <span class="badge badge-violet">Unified Index</span>
-          </div>
-          <div class="flex gap-3">
-            <input type="text" class="input-field" placeholder="Search messages, documents, files, memories, diary..." style="flex: 1;" />
-            <button class="btn btn-primary">Search</button>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="empty-state">
-            <div class="empty-state-icon">${Icons.search}</div>
-            <h3 class="card-title">Unified Search Across All 15 Modules</h3>
-            <p class="text-muted">Filter by date, category, or module type.</p>
-          </div>
-        </div>
-      </div>
-    `,
-    mount: () => {}
-  },
+  // 12. SMART SEARCH (PHASE 9 UNIFIED INDEX ACROSS ALL MODULES)
+  search: SearchModule,
 
   // 13. DEVICE MANAGER (PHASE 2 LIVE DATA & REVOCATION)
   devices: {
