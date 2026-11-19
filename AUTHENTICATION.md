@@ -43,3 +43,17 @@ sequenceDiagram
 - Active sessions are fingerprinted by User Agent, platform, and truncated IP hash.
 - Tokens expire after 30 days unless revoked earlier.
 - Remote revocation: either user can trigger "Revoke All Other Sessions" from Module 13 (Device Manager), instantly invalidating Supabase tokens in the database.
+
+---
+
+## 4. SMTP 2FA & Emergency Relay Configuration
+
+- **Relay Provider:** Gmail Dedicated SMTP Relay (`smtp.gmail.com`).
+- **Sender Account:** `gost81416@gmail.com`.
+- **Port / Security:** Port 465 (SSL) / Port 587 (STARTTLS).
+- **Configuration File:** `js/config/smtp.config.js`.
+- **Email Service Engine:** `js/services/email.service.js`.
+- **Dispatches Supported:**
+  - 6-Digit Email OTP codes for Multi-Step Authentication.
+  - Password Reset notifications.
+  - Critical Security Alerts (New device registrations, session revocations, emergency kit exports).

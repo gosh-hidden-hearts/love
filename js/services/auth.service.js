@@ -6,6 +6,7 @@
 import { FirebaseConfig } from '../config/firebase.config.js';
 import { State } from '../state.js';
 import { Toast } from '../components/toast.js';
+import { Email } from './email.service.js';
 
 class AuthService {
   constructor() {
@@ -126,12 +127,18 @@ class AuthService {
 
     sessionStorage.setItem(this.pendingOtpKey, JSON.stringify(pendingData));
 
-    // Dispatch OTP (In production: Firebase Email Link / Action code)
+    // Dispatch 6-digit OTP via configured Gmail SMTP Relay
+    try {
+      await Email.sendOtpCode(cleanEmail, otpCode, authorizedUser.displayName);
+    } catch (mailErr) {
+      console.warn('[GOSH SMTP] Non-blocking mail dispatch warning:', mailErr);
+    }
     console.log(`[GOSH SECURITY DISPATCH] 6-Digit Email OTP for ${cleanEmail}: ${otpCode}`);
 
     this.recordSecurityEvent('OTP_DISPATCHED', 'INFO', {
       email: cleanEmail,
-      expiresAt: new Date(otpExpiry).toISOString()
+      expiresAt: new Date(otpExpiry).toISOString(),
+      smtpRelay: Email.config.auth.user
     });
 
     return {
@@ -365,6 +372,11 @@ class AuthService {
     }
 
     this.recordSecurityEvent('PASSWORD_RESET_REQUESTED', 'INFO', { email: cleanEmail });
+    try {
+      await Email.sendPasswordReset(cleanEmail, isAuth.displayName);
+    } catch (mailErr) {
+      console.warn('[GOSH SMTP] Password reset email dispatch warning:', mailErr);
+    }
     console.log(`[GOSH SECURITY] Password reset dispatch initiated for: ${cleanEmail}`);
     return { success: true };
   }
