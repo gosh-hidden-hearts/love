@@ -60,3 +60,8 @@
 | **Shared Expense 50/50 Split** | Phase 9 Together | `node js/testing/lifestyle.test.js` | **PASS** | Joint transactions tracked; net balance calculated (Sam owes Alex $150.00). |
 | **Shared Playlists & Audio** | Phase 9 Music | `node js/testing/lifestyle.test.js` | **PASS** | Playlists curated; streaming links tagged; HTML5 audio player state tracked. |
 | **Unified Multi-Module Search** | Phase 9 Smart Search | `node js/testing/lifestyle.test.js` | **PASS** | Real-time search across messages, files, memories, diary, tasks, and expenses. |
+| **BIP-39 Mnemonic Generator** | Phase 10 Disaster Recovery | `node js/testing/recovery.test.js` | **PASS** | 24-word cryptographic seed generated and validated against canonical dictionary. |
+| **Encrypted JSON Emergency Kit** | Phase 10 Disaster Recovery | `node js/testing/recovery.test.js` | **PASS** | Export bundle generated with zero plaintext and valid 64-hex-char SHA-256 checksum. |
+| **Master Key Rotation** | Phase 10 Disaster Recovery | `node js/testing/recovery.test.js` | **PASS** | All vault secrets re-encrypted under new salt/key; old passphrase invalidated. |
+| **Tamper-Evident Restore** | Phase 10 Disaster Recovery | `node js/testing/recovery.test.js` | **PASS** | Modified backup strictly rejected; authentic backup restores all credentials. |
+| **Hardware Device Revocation** | Phase 10 Device Manager | `node js/testing/recovery.test.js` | **PASS** | Secondary device revoked; "Revoke All Other Devices" verified in security ledger. |

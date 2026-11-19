@@ -39,6 +39,8 @@ class VaultService {
       throw new Error('Passphrase must be at least 8 characters long.');
     }
 
+    this.initSalt();
+
     // Derive Master Encryption Key via PBKDF2-HMAC-SHA256 (100,000 iterations)
     const derivedKey = await Crypto.deriveKey(passphrase, new Uint8Array(this.salt), 100000);
 
