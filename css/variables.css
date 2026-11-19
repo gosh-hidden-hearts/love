@@ -1,52 +1,68 @@
 /* ==========================================================================
    GOSH DESIGN SYSTEM — DESIGN TOKENS & VARIABLES
-   Classification: Private Digital Ecosystem
+   Theme: Premium Love-Themed Mobile-First Social Messaging Platform
+   Palette: Deep Burgundy, Wine Red, Soft Rose, Warm Ivory, Midnight Plum, Champagne
    ========================================================================== */
 
 :root {
   /* Surface & Background Colors */
-  --bg-primary: #121316;        /* Deep Charcoal - Main app background */
-  --bg-secondary: #18191f;      /* Soft Graphite - Sidebars & Headers */
-  --bg-surface: #20222a;        /* Obsidian Layer - Cards & Containers */
-  --bg-surface-hover: #292b36;  /* Elevated surface on hover */
-  --bg-surface-active: #323542; /* Pressed/Active surface */
-  --bg-glass: rgba(26, 27, 34, 0.85); /* Glassmorphism backdrops */
-  --bg-input: #15161b;          /* High-contrast form field fill */
+  --bg-primary: #120914;        /* Deep Midnight Plum - Main app background */
+  --bg-secondary: #1a0d1d;      /* Deep Burgundy Slate - Navigation & Headers */
+  --bg-surface: #241126;        /* Refined Plum Surface - Cards & Containers */
+  --bg-surface-hover: #301734;  /* Elevated surface on hover */
+  --bg-surface-active: #3d1c42; /* Pressed/Active surface */
+  --bg-glass: rgba(26, 13, 29, 0.88); /* Glassmorphism backdrops */
+  --bg-input: #170b19;          /* High-contrast form field fill */
+  --bg-app-container: #0e0610;  /* Mobile viewport container background */
 
   /* Borders & Dividers */
-  --border-subtle: #2b2e3a;     /* Delicate border for cards and sections */
-  --border-medium: #3b3f50;     /* Focused states and elevated borders */
-  --border-bright: #52576e;     /* High-contrast divider */
+  --border-subtle: #381a3d;     /* Delicate border for cards and sections */
+  --border-medium: #4e2456;     /* Focused states and elevated borders */
+  --border-bright: #6e3579;     /* High-contrast divider */
 
-  /* Brand Accents */
-  --accent-primary: #8b5cf6;       /* Subtle Regal Violet */
-  --accent-primary-hover: #9d75f8;
-  --accent-primary-dark: #6d28d9;
-  --accent-primary-glow: rgba(139, 92, 246, 0.25);
-  --accent-primary-muted: rgba(139, 92, 246, 0.12);
+  /* Brand Accents — Romantic Palette */
+  --accent-primary: #8b264b;       /* Elegant Wine Red */
+  --accent-primary-hover: #a33458; /* Luminous Wine */
+  --accent-primary-dark: #661834;  /* Deep Burgundy */
+  --accent-primary-glow: rgba(139, 38, 75, 0.35);
+  --accent-primary-muted: rgba(139, 38, 75, 0.16);
 
   --accent-secondary: #f5e0b7;     /* Discreet Champagne */
   --accent-secondary-hover: #faebd0;
   --accent-secondary-dark: #d8c092;
-  --accent-secondary-glow: rgba(245, 224, 183, 0.2);
-  --accent-secondary-muted: rgba(245, 224, 183, 0.1);
+  --accent-secondary-glow: rgba(245, 224, 183, 0.25);
+  --accent-secondary-muted: rgba(245, 224, 183, 0.12);
+
+  --accent-rose: #e08da3;          /* Soft Romantic Rose */
+  --accent-rose-hover: #eba3b6;
+  --accent-rose-muted: rgba(224, 141, 163, 0.15);
+  --accent-burgundy: #721c3b;      /* Royal Burgundy */
+  --accent-plum: #2d1330;          /* Midnight Plum */
+
+  /* Chat Message Bubbles */
+  --chat-sent-bg: linear-gradient(135deg, #8b264b, #721c3b);
+  --chat-sent-text: #faf5f0;
+  --chat-received-bg: #221226;
+  --chat-received-text: #faf5f0;
+  --chat-ticks-read: #f5e0b7;      /* Warm Champagne Read Checkmarks */
 
   /* Semantic Feedback */
   --color-success: #10b981;
   --color-success-muted: rgba(16, 185, 129, 0.15);
   --color-warning: #f59e0b;
   --color-warning-muted: rgba(245, 158, 11, 0.15);
-  --color-danger: #ef4444;
-  --color-danger-muted: rgba(239, 68, 68, 0.15);
-  --color-info: #38bdf8;
-  --color-info-muted: rgba(56, 189, 248, 0.15);
+  --color-danger: #f43f5e;        /* Rose-Red Alert */
+  --color-danger-muted: rgba(244, 63, 94, 0.15);
+  --color-info: #e08da3;
+  --color-info-muted: rgba(224, 141, 163, 0.15);
 
   /* Typography / Text Colors */
-  --text-primary: #f8fafc;      /* Crisp white for headings and key copy */
-  --text-secondary: #cbd5e1;    /* Readable body text */
-  --text-muted: #94a3b8;        /* Supporting text, timestamps, labels */
-  --text-subtle: #64748b;       /* Placeholders, disabled states */
-  --text-inverse: #0f172a;      /* Text on bright champagne/white badges */
+  --text-primary: #faf5f0;      /* Warm Ivory for crisp headings and key copy */
+  --text-secondary: #e2d7e5;    /* Soft Lavender-White body text */
+  --text-muted: #a692ab;        /* Supporting text, timestamps, labels */
+  --text-subtle: #75627a;       /* Placeholders, disabled states */
+  --text-inverse: #120914;      /* Text on bright champagne/white badges */
+  --text-rose: #f2b5c4;         /* Romantic highlighted text */
 
   /* Font Families */
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;

@@ -22,10 +22,14 @@ import { MusicModule } from './music/music.module.js';
 import { SearchModule } from './search/search.module.js';
 import { DevicesModule } from './devices/devices.module.js';
 import { RecoveryModule } from './recovery/recovery.module.js';
+import { ProfileView } from './profile/profile.view.js';
 
 export const Views = {
   // 01. AUTHENTICATION VIEW (PHASE 2 MULTI-STEP FLOW)
   auth: AuthView,
+
+  // DEDICATED PROFILE & BIOGRAPHY MANAGEMENT (PHASE 9)
+  profile: ProfileView,
 
   // 02. HOME DASHBOARD (PHASE 4 LIVE TELEMETRY & FEEDS)
   home: DashboardModule,

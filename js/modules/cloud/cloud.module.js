@@ -60,13 +60,13 @@ export const CloudModule = {
         <div class="card flex justify-between items-center" style="margin-bottom: var(--space-4);">
           <div>
             <div class="flex items-center gap-2" style="margin-bottom: var(--space-2); flex-wrap: wrap;">
-              <span class="badge badge-violet">MEGA Dedicated Cloud Storage</span>
-              <a href="${Mega.getAccountUrl()}" target="_blank" rel="noopener noreferrer" class="badge badge-champagne" style="text-decoration: none;" title="Open Connected MEGA Account">
+              <span class="badge badge-violet">Sovereign Memory Wallet</span>
+              <a href="${Mega.getAccountUrl()}" target="_blank" rel="noopener noreferrer" class="badge badge-champagne" style="text-decoration: none;" title="Open Connected MEGA Storage">
                 ● Connected: 1ixlVZLR
               </a>
             </div>
-            <h1 class="card-title" style="font-size: var(--text-xl);">GOSH Cloud</h1>
-            <p class="text-muted">Zero-cost private cloud drive powered by dedicated 20 GB MEGA account.</p>
+            <h1 class="card-title" style="font-size: var(--text-xl);">Memory Wallet</h1>
+            <p class="text-muted">Zero-cost private cloud drive (GOSH Cloud) powered by dedicated 20 GB MEGA account.</p>
           </div>
           <div class="flex gap-2 items-center">
             <!-- Hidden native file input -->
@@ -248,7 +248,7 @@ export const CloudModule = {
     if (newFolderBtn) {
       newFolderBtn.addEventListener('click', () => {
         Modal.open({
-          title: 'Create Cloud Folder',
+          title: 'Create Memory Wallet Folder',
           content: `
             <div class="flex flex-col gap-3">
               <div class="form-group">

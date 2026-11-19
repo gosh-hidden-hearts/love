@@ -5,7 +5,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node js/testing/auth.test.js && node js/testing/email.test.js && node js/testing/db.test.js && node js/testing/dashboard.test.js && node js/testing/connect.test.js && node js/testing/cloud.test.js && node js/testing/vault.test.js && node js/testing/calls.test.js && node js/testing/lifestyle.test.js && node js/testing/recovery.test.js && node js/testing/deployment.test.js && node js/testing/e2e_verification.test.js",
+    "test": "node js/testing/auth.test.js && node js/testing/email.test.js && node js/testing/db.test.js && node js/testing/dashboard.test.js && node js/testing/connect.test.js && node js/testing/cloud.test.js && node js/testing/vault.test.js && node js/testing/calls.test.js && node js/testing/lifestyle.test.js && node js/testing/recovery.test.js && node js/testing/deployment.test.js && node js/testing/e2e_verification.test.js && node js/testing/public_auth_chat.test.js",
     "cap:sync": "cap sync",
     "cap:open": "cap open android"
   },
