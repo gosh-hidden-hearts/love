@@ -21,3 +21,8 @@
 | **Device Fingerprinting** | Phase 2 Auth Security | `node js/testing/auth.test.js` (Test 5) | **PASS** | Device fingerprint recorded; new device security event logged. |
 | **Remote Session Revocation** | Phase 2 Auth Security | `node js/testing/auth.test.js` (Test 7) | **PASS** | Revoke all other devices marked sessions revoked; terminated access. |
 | **Route Security Guard** | Phase 2 SPA Guard | Navigation interception in `router.js` | **PASS** | Unauthenticated routes redirected to `#auth`; auth route redirected to `#home` when logged in. |
+| **Database Schema & DDL** | Phase 3 PostgreSQL | SQL Migration `01_initial_schema.sql` | **PASS** | 21 relational tables, foreign key cascades, and performance indexes defined. |
+| **Row Level Security (RLS)** | Phase 3 Security | SQL Policies `02_rls_policies.sql` | **PASS** | 100% of tables covered by RLS; explicit anonymous denial; `is_authorized_gosh_user()` helper. |
+| **Database Security Gate** | Phase 3 Auth Gate | `node js/testing/db.test.js` (Test 1) | **PASS** | Unauthenticated queries strictly rejected with Access Denied. |
+| **Database Seed Integrity** | Phase 3 Seed Data | `node js/testing/db.test.js` (Test 2) | **PASS** | Initial room, cloud folders, and playlists verified. |
+| **CRUD & Realtime Sync** | Phase 3 Operations | `node js/testing/db.test.js` (Test 3, 4, 5, 6) | **PASS** | Insert, query by filter, update, realtime subscription, and delete verified. |

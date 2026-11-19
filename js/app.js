@@ -10,12 +10,14 @@ import { Toast } from './components/toast.js';
 import { Modal } from './components/modal.js';
 import { Icons } from './components/icons.js';
 import { Auth } from './services/auth.service.js';
+import { DB } from './services/db.service.js';
 
 // Expose core component APIs globally for inline action triggers
 window.Toast = Toast;
 window.Modal = Modal;
 window.GOSHState = State;
 window.Auth = Auth;
+window.DB = DB;
 
 class App {
   constructor() {
