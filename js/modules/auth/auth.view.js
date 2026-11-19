@@ -2,11 +2,11 @@
  * GOSH INTERACTIVE AUTHENTICATION VIEW MODULE (PHASE 2)
  */
 
-import { Icons } from '../components/icons.js';
-import { Auth } from '../services/auth.service.js';
-import { Toast } from '../components/toast.js';
-import { Modal } from '../components/modal.js';
-import { AppRouter } from '../router.js';
+import { Icons } from '../../components/icons.js';
+import { Auth } from '../../services/auth.service.js';
+import { Toast } from '../../components/toast.js';
+import { Modal } from '../../components/modal.js';
+import { AppRouter } from '../../router.js';
 
 export const AuthView = {
   render: () => `

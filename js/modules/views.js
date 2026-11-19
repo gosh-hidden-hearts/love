@@ -133,17 +133,18 @@ export const Views = {
       `;
     },
     mount: (container) => {
-      const logoutBtn = container.querySelector('#settings-logout-btn');
+      const root = container || document;
+      const logoutBtn = root.querySelector('#settings-logout-btn');
       if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
-          Modal.confirm({
-            title: 'Sign Out',
-            message: 'Are you sure you want to sign out from this device?',
-            confirmText: 'Sign Out',
-            onConfirm: () => {
+          Modal.confirm(
+            'Sign Out',
+            'Are you sure you want to sign out from this device?',
+            () => {
               Auth.logout();
+              window.location.hash = '#auth';
             }
-          });
+          );
         });
       }
     }

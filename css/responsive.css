@@ -116,6 +116,13 @@
   }
 }
 
+/* Compact Mobile Handhelds (<= 480px) */
+@media (max-width: 480px) {
+  .main-container {
+    padding: var(--space-2);
+  }
+}
+
 /* Small Handhelds (<= 400px) */
 @media (max-width: 400px) {
   .brand-title {
