@@ -1,0 +1,27 @@
+{
+  "appId": "com.gosh.private",
+  "appName": "GOSH",
+  "webDir": ".",
+  "bundledWebRuntime": false,
+  "server": {
+    "cleartext": false,
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false,
+    "backgroundColor": "#0d0e12"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "backgroundColor": "#0d0e12",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#0d0e12"
+    }
+  }
+}

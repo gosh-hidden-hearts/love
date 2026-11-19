@@ -9,6 +9,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>GOSH — Your Space. Your Stories.</title>
 
+  <!-- PWA Manifest & App Icons -->
+  <link rel="manifest" href="manifest.json" />
+
   <!-- Preload Stylesheets -->
   <link rel="stylesheet" href="css/variables.css" />
   <link rel="stylesheet" href="css/base.css" />
@@ -170,5 +173,16 @@
 
   <!-- App Bootstrapper -->
   <script type="module" src="js/app.js"></script>
+
+  <!-- Offline PWA Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch((err) => {
+          console.warn('[GOSH PWA] Service worker registration non-blocking:', err);
+        });
+      });
+    }
+  </script>
 </body>
 </html>

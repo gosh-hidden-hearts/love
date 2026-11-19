@@ -65,3 +65,8 @@
 | **Master Key Rotation** | Phase 10 Disaster Recovery | `node js/testing/recovery.test.js` | **PASS** | All vault secrets re-encrypted under new salt/key; old passphrase invalidated. |
 | **Tamper-Evident Restore** | Phase 10 Disaster Recovery | `node js/testing/recovery.test.js` | **PASS** | Modified backup strictly rejected; authentic backup restores all credentials. |
 | **Hardware Device Revocation** | Phase 10 Device Manager | `node js/testing/recovery.test.js` | **PASS** | Secondary device revoked; "Revoke All Other Devices" verified in security ledger. |
+| **GitHub Actions Pages Workflow** | Phase 11 Deployment | `node js/testing/deployment.test.js` | **PASS** | Automated workflow configured with `pages: write` and zero-build root path upload. |
+| **Capacitor Android Config** | Phase 11 Capacitor | `node js/testing/deployment.test.js` | **PASS** | `appId`, `appName`, `webDir: "."`, HTTPS scheme, and dark styling verified. |
+| **PWA Web Manifest & Offline Cache** | Phase 11 PWA | `node js/testing/deployment.test.js` | **PASS** | `manifest.json` standalone mode and `sw.js` offline pre-caching verified. |
+| **Android Native Permissions** | Phase 11 Android | `node js/testing/deployment.test.js` | **PASS** | `CAMERA`, `RECORD_AUDIO`, `INTERNET`, `ACCESS_NETWORK_STATE` declared in manifest. |
+| **Zero-Build Constraint Verification** | Phase 11 Pure Web | `node js/testing/deployment.test.js` | **PASS** | Verified 0 frontend bundlers/frameworks; 100% pure HTML5/CSS3/Vanilla JS. |
