@@ -46,3 +46,10 @@
 | **Vault Zero-Plaintext Storage** | Phase 7 Vault | `node js/testing/vault.test.js` (Test 5 & 6) | **PASS** | Zero plaintext in database; unique 96-bit IV; authentic credentials restored. |
 | **Vault Auto-Lock & Memory Purge** | Phase 7 Vault | `node js/testing/vault.test.js` (Test 7 & 8) | **PASS** | Master Key wiped from volatile memory on lock; queries rejected while locked. |
 | **Confidential Document Locker** | Phase 7 Documents | `node js/testing/vault.test.js` (Test 10) | **PASS** | Document records linked to MEGA file handles; classified by category. |
+| **STUN Discovery & Config** | Phase 8 WebRTC | `node js/testing/calls.test.js` | **PASS** | Primary Google STUN endpoints configured; 0 paid TURN relays required. |
+| **Call Duration Utility** | Phase 8 WebRTC | `node js/testing/calls.test.js` | **PASS** | `formatDuration` correctly renders MM:SS formats up to multi-hour calls. |
+| **Unauthenticated Call Protection** | Phase 8 WebRTC Security | `node js/testing/calls.test.js` | **PASS** | Unauthorized call attempts rejected by authentication guard. |
+| **Signaling Dispatch & Events** | Phase 8 WebRTC Signaling | `node js/testing/calls.test.js` | **PASS** | SDP offer/answer/hangup packets dispatched with intact payloads. |
+| **Media Controls (Mute/Camera)** | Phase 8 WebRTC Media | `node js/testing/calls.test.js` | **PASS** | Audio track mute and video track pause toggle correctly with event notifications. |
+| **Call Timer & Stage Rendering** | Phase 8 WebRTC UI | `node js/testing/calls.test.js` | **PASS** | Timer tracking verified; full screen in-call HUD and lobby rendered. |
+| **Call History DB Persistence** | Phase 8 Database | `node js/testing/calls.test.js` | **PASS** | Call records persisted to `call_history` with caller, receiver, duration, and status. |

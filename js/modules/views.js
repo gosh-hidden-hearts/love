@@ -14,6 +14,7 @@ import { ConnectModule } from './connect/connect.module.js';
 import { CloudModule } from './cloud/cloud.module.js';
 import { VaultModule } from './vault/vault.module.js';
 import { DocumentsModule } from './documents/documents.module.js';
+import { CallsModule } from './calls/calls.module.js';
 
 export const Views = {
   // 01. AUTHENTICATION VIEW (PHASE 2 MULTI-STEP FLOW)
@@ -25,60 +26,8 @@ export const Views = {
   // 03. CONNECT (PHASE 5 LIVE E2EE CHAT, MEDIA & REACTIONS)
   connect: ConnectModule,
 
-  // 04. CALLS (WEBRTC)
-  calls: {
-    render: () => `
-      <div class="view-container">
-        <div class="card flex justify-between items-center" style="margin-bottom: var(--space-6);">
-          <div>
-            <h1 class="card-title" style="font-size: var(--text-xl);">GOSH Calls</h1>
-            <p class="text-muted">Direct P2P Encrypted Audio, Video & Screen Sharing</p>
-          </div>
-          <div class="flex gap-2">
-            <button class="btn btn-secondary" onclick="window.Toast.info('Voice Call', 'WebRTC signaling channel will be bound in Phase 8.')">
-              ${Icons.calls}
-              <span>Voice Call</span>
-            </button>
-            <button class="btn btn-primary" onclick="window.Toast.info('Video Call', 'WebRTC signaling channel will be bound in Phase 8.')">
-              ${Icons.calls}
-              <span>Video Call</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Video Call Stage Preview -->
-        <div class="card" style="aspect-ratio: 16/9; max-height: 520px; background: #0a0b0e; border: 1px solid var(--border-medium); display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; margin-bottom: var(--space-6); overflow: hidden;">
-          <div class="text-center" style="z-index: 1;">
-            <div class="brand-emblem" style="width: 64px; height: 64px; margin: 0 auto var(--space-4); font-size: 1.8rem;">G</div>
-            <h3 style="font-size: var(--text-lg); font-weight: 600;">Call Lobby Ready</h3>
-            <p class="text-muted" style="margin-top: 4px; font-size: var(--text-sm);">STUN/WebRTC Channel Standing By</p>
-          </div>
-
-          <!-- In-call Controls Overlay Bar -->
-          <div style="position: absolute; bottom: 20px; display: flex; gap: var(--space-3); background: rgba(26, 27, 34, 0.9); padding: 10px 18px; border-radius: var(--radius-full); border: 1px solid var(--border-subtle); backdrop-filter: blur(8px);">
-            <button class="btn btn-icon btn-secondary" title="Toggle Mic" onclick="this.classList.toggle('btn-danger')">${Icons.calls}</button>
-            <button class="btn btn-icon btn-secondary" title="Toggle Camera" onclick="this.classList.toggle('btn-danger')">${Icons.memories}</button>
-            <button class="btn btn-icon btn-secondary" title="Screen Share" onclick="window.Toast.info('Screen Share', 'MediaProjection & displayMedia will activate in Phase 8.')">${Icons.devices}</button>
-            <button class="btn btn-icon btn-danger" title="End Call">${Icons.close}</button>
-          </div>
-        </div>
-
-        <!-- Call History -->
-        <div class="card">
-          <div class="card-header">
-            <h2 class="card-title">Recent Calls</h2>
-            <span class="text-xs text-muted">Protected Log</span>
-          </div>
-          <div class="empty-state" style="padding: var(--space-6);">
-            <div class="empty-state-icon">${Icons.calls}</div>
-            <p class="text-sm font-semibold">No call records yet</p>
-            <p class="text-xs text-muted">Calls made between authorized devices will be logged here.</p>
-          </div>
-        </div>
-      </div>
-    `,
-    mount: () => {}
-  },
+  // 04. CALLS (PHASE 8 WEBRTC DIRECT P2P CALLING & SCREEN SHARING)
+  calls: CallsModule,
 
   // 05. VAULT (PHASE 7 ZERO-KNOWLEDGE PASSWORD MANAGER)
   vault: VaultModule,
