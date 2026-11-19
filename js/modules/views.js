@@ -11,6 +11,7 @@ import { AuthView } from './auth/auth.view.js';
 import { Auth } from '../services/auth.service.js';
 import { DashboardModule } from './dashboard/dashboard.module.js';
 import { ConnectModule } from './connect/connect.module.js';
+import { CloudModule } from './cloud/cloud.module.js';
 
 export const Views = {
   // 01. AUTHENTICATION VIEW (PHASE 2 MULTI-STEP FLOW)
@@ -159,66 +160,8 @@ export const Views = {
     mount: () => {}
   },
 
-  // 06. CLOUD (MEGA STORAGE)
-  cloud: {
-    render: () => `
-      <div class="view-container">
-        <div class="card flex justify-between items-center" style="margin-bottom: var(--space-6);">
-          <div>
-            <div class="badge badge-violet" style="margin-bottom: var(--space-2);">MEGA Free Tier Storage</div>
-            <h1 class="card-title" style="font-size: var(--text-xl);">GOSH Cloud</h1>
-            <p class="text-muted">Dedicated 20 GB encrypted cloud drive for files and media.</p>
-          </div>
-          <div class="flex gap-2">
-            <button class="btn btn-secondary" onclick="window.Toast.info('New Folder', 'Folder management via Supabase + MEGA active in Phase 6.')">
-              + New Folder
-            </button>
-            <button class="btn btn-primary" onclick="window.Toast.info('File Upload', 'Streaming Edge Gateway upload active in Phase 6.')">
-              ${Icons.cloud}
-              <span>Upload File</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Storage Quota Bar -->
-        <div class="card" style="margin-bottom: var(--space-6);">
-          <div class="flex justify-between items-center">
-            <span class="text-sm font-semibold">Storage Usage</span>
-            <span class="text-xs text-muted">100 MB of 20.0 GB used</span>
-          </div>
-          <div style="background: var(--border-subtle); height: 8px; border-radius: var(--radius-full); margin-top: var(--space-3); overflow: hidden;">
-            <div style="background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary)); width: 0.5%; height: 100%;"></div>
-          </div>
-        </div>
-
-        <!-- Files & Folders View -->
-        <div class="card">
-          <div class="card-header">
-            <h2 class="card-title">Root Directory</h2>
-            <span class="text-xs text-muted">3 Folders • 14 Files</span>
-          </div>
-          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--space-3);">
-            <div class="card card-interactive text-center" style="padding: var(--space-4); background: var(--bg-surface-hover);">
-              <div style="color: var(--accent-primary); margin-bottom: 8px;">${Icons.cloud}</div>
-              <div class="text-sm font-semibold truncate">Documents</div>
-              <div class="text-xs text-muted">6 files</div>
-            </div>
-            <div class="card card-interactive text-center" style="padding: var(--space-4); background: var(--bg-surface-hover);">
-              <div style="color: var(--color-info); margin-bottom: 8px;">${Icons.memories}</div>
-              <div class="text-sm font-semibold truncate">Photo Albums</div>
-              <div class="text-xs text-muted">24 items</div>
-            </div>
-            <div class="card card-interactive text-center" style="padding: var(--space-4); background: var(--bg-surface-hover);">
-              <div style="color: var(--accent-secondary); margin-bottom: 8px;">${Icons.recovery}</div>
-              <div class="text-sm font-semibold truncate">Encrypted Backups</div>
-              <div class="text-xs text-muted">2 archives</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    `,
-    mount: () => {}
-  },
+  // 06. CLOUD (PHASE 6 MEGA CLOUD STORAGE)
+  cloud: CloudModule,
 
   // 07. MEMORIES
   memories: {

@@ -37,3 +37,7 @@
 | **Message Editing & Deletion** | Phase 5 Connect | `node js/testing/connect.test.js` (Test 5 & 8) | **PASS** | Edited message marked and updated; deleted message permanently removed. |
 | **Emoji Reactions Sync** | Phase 5 Connect | `node js/testing/connect.test.js` (Test 6) | **PASS** | Reactions added, queried, and toggled in database. |
 | **Disappearing Messages TTL** | Phase 5 Connect | `node js/testing/connect.test.js` (Test 7) | **PASS** | Expired TTL messages automatically filtered; future messages retained. |
+| **MEGA Quota Telemetry** | Phase 6 Cloud | `node js/testing/cloud.test.js` (Test 1 & 5) | **PASS** | 20 GB free tier quota tracked; uploads increase usage; deletes reclaim bytes. |
+| **Folder Hierarchy & CRUD** | Phase 6 Cloud | `node js/testing/cloud.test.js` (Test 2, 3, 8) | **PASS** | Folder created, renamed, navigated, and deleted with cascading cleanup. |
+| **File Upload & Progress** | Phase 6 Cloud | `node js/testing/cloud.test.js` (Test 4) | **PASS** | File upload progress dispatches to 100%; `mega_handle` persisted in database. |
+| **File Rename & Deletion** | Phase 6 Cloud | `node js/testing/cloud.test.js` (Test 6 & 7) | **PASS** | File rename updates record; delete frees storage quota immediately. |
