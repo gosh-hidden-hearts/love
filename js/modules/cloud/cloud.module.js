@@ -59,16 +59,23 @@ export const CloudModule = {
         <!-- Top Cloud Header & Action Bar -->
         <div class="card flex justify-between items-center" style="margin-bottom: var(--space-4);">
           <div>
-            <div class="badge badge-violet" style="margin-bottom: var(--space-2);">
-              MEGA Dedicated Cloud Storage
+            <div class="flex items-center gap-2" style="margin-bottom: var(--space-2); flex-wrap: wrap;">
+              <span class="badge badge-violet">MEGA Dedicated Cloud Storage</span>
+              <a href="${Mega.getAccountUrl()}" target="_blank" rel="noopener noreferrer" class="badge badge-champagne" style="text-decoration: none;" title="Open Connected MEGA Account">
+                ● Connected: 1ixlVZLR
+              </a>
             </div>
             <h1 class="card-title" style="font-size: var(--text-xl);">GOSH Cloud</h1>
             <p class="text-muted">Zero-cost private cloud drive powered by dedicated 20 GB MEGA account.</p>
           </div>
-          <div class="flex gap-2">
+          <div class="flex gap-2 items-center">
             <!-- Hidden native file input -->
             <input type="file" id="cloud-file-input" style="display: none;" multiple />
             
+            <a href="${Mega.getAccountUrl()}" target="_blank" rel="noopener noreferrer" class="btn btn-ghost btn-sm" title="Open Connected MEGA Account in New Tab" style="display: inline-flex; align-items: center; gap: 4px;">
+              <span>Open MEGA</span>
+              <span>↗</span>
+            </a>
             <button class="btn btn-secondary" id="new-folder-btn">
               + New Folder
             </button>

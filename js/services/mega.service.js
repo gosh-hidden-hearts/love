@@ -7,11 +7,21 @@ import { DB } from './db.service.js';
 import { Auth } from './auth.service.js';
 import { State } from '../state.js';
 import { Toast } from '../components/toast.js';
+import { MegaConfig } from '../config/mega.config.js';
 
 class MegaService {
   constructor() {
-    this.totalQuotaBytes = 20 * 1024 * 1024 * 1024; // 20 GB MEGA Free Tier
+    this.totalQuotaBytes = MegaConfig.quotaBytes || (20 * 1024 * 1024 * 1024); // 20 GB MEGA Free Tier
+    this.accountUrl = MegaConfig.accountUrl || 'https://mega.nz/C!1ixlVZLR';
     this.blobCacheKey = 'gosh_mega_blobs_';
+  }
+
+  getAccountUrl() {
+    return this.accountUrl;
+  }
+
+  getAccountStatus() {
+    return MegaConfig.status || 'connected';
   }
 
   // 1. UPLOAD FILE WITH CHUNKED PROGRESS TRACKING

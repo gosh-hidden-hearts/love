@@ -21,6 +21,7 @@ const CORE_ASSETS = [
   './js/components/toast.js',
   './js/config/firebase.config.js',
   './js/config/supabase.config.js',
+  './js/config/mega.config.js',
   './js/services/auth.service.js',
   './js/services/db.service.js',
   './js/services/crypto.service.js',

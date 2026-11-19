@@ -130,6 +130,10 @@ async function runCloudTests() {
   // TEST 9: Byte Formatting Utility
   assert(CloudModule.formatBytes(104857600) === '100 MB', 'TEST 9: Format 100 MB string properly');
 
+  // TEST 10: Connected MEGA Account Verification
+  assert(Mega.getAccountUrl() === 'https://mega.nz/C!1ixlVZLR', 'TEST 10: Connected MEGA account URL matches configured endpoint');
+  assert(Mega.getAccountStatus() === 'connected', 'TEST 10: Account status reports connected');
+
   console.log(`\nTEST RESULTS: ${passed} Passed, ${failed} Failed.`);
   if (failed > 0) process.exit(1);
 }

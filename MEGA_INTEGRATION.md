@@ -5,6 +5,8 @@
 ## 1. Storage Role & Quota
 
 - **Provider:** MEGA (Dedicated Zero-Cost Account).
+- **Connected Dedicated Account:** `https://mega.nz/C!1ixlVZLR` (Contact / Account ID: `1ixlVZLR`).
+- **Configuration File:** `js/config/mega.config.js`.
 - **Free-Tier Capacity:** 20 GB permanent storage.
 - **Role:** Actual blob storage for user files, photo memories, video clips, and document attachments.
 - **Supabase Role:** Relational metadata only (`file_name`, `mime_type`, `file_size`, `folder_id`, `mega_node_id`, `encryption_iv`).
