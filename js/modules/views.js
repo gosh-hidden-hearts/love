@@ -12,6 +12,8 @@ import { Auth } from '../services/auth.service.js';
 import { DashboardModule } from './dashboard/dashboard.module.js';
 import { ConnectModule } from './connect/connect.module.js';
 import { CloudModule } from './cloud/cloud.module.js';
+import { VaultModule } from './vault/vault.module.js';
+import { DocumentsModule } from './documents/documents.module.js';
 
 export const Views = {
   // 01. AUTHENTICATION VIEW (PHASE 2 MULTI-STEP FLOW)
@@ -78,87 +80,8 @@ export const Views = {
     mount: () => {}
   },
 
-  // 05. VAULT (PASSWORD MANAGER)
-  vault: {
-    render: () => `
-      <div class="view-container">
-        <div class="card flex justify-between items-center" style="margin-bottom: var(--space-6);">
-          <div>
-            <div class="badge badge-champagne" style="margin-bottom: var(--space-2);">AES-256-GCM Zero-Knowledge</div>
-            <h1 class="card-title" style="font-size: var(--text-xl);">GOSH Vault</h1>
-            <p class="text-muted">Encrypted passwords, credentials, cards, and secure notes.</p>
-          </div>
-          <div class="flex gap-2">
-            <button class="btn btn-secondary" onclick="window.Toast.info('Password Generator', 'Cryptographic generator available in Phase 7.')">
-              ${Icons.unlock}
-              <span>Generate</span>
-            </button>
-            <button class="btn btn-primary" onclick="window.Toast.info('New Credential', 'Phase 7 will provide encrypted entry creation.')">
-              <span>+ Add Item</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Master Vault Unlock Banner -->
-        <div class="card flex justify-between items-center" style="margin-bottom: var(--space-6); background: var(--bg-surface-hover); border: 1px solid var(--accent-secondary-dark);">
-          <div class="flex items-center gap-3">
-            <div style="color: var(--accent-secondary);">${Icons.lock}</div>
-            <div>
-              <div class="text-sm font-semibold" style="color: var(--accent-secondary);">Vault is Currently Locked</div>
-              <p class="text-xs text-muted" style="margin: 0;">Enter your master passphrase to decrypt credentials into memory.</p>
-            </div>
-          </div>
-          <button class="btn btn-accent btn-sm" onclick="window.Toast.info('Vault Unlock', 'Passphrase entry and PBKDF2 derivation will be implemented in Phase 7.')">
-            Unlock Vault
-          </button>
-        </div>
-
-        <!-- Category Filter & Items List -->
-        <div class="card">
-          <div class="flex justify-between items-center" style="margin-bottom: var(--space-4);">
-            <div class="flex gap-2">
-              <button class="btn btn-secondary btn-sm">All Items (12)</button>
-              <button class="btn btn-ghost btn-sm">Logins</button>
-              <button class="btn btn-ghost btn-sm">Secure Notes</button>
-              <button class="btn btn-ghost btn-sm">Cards</button>
-            </div>
-            <input type="text" class="input-field" placeholder="Search vault..." style="max-width: 240px; padding: 6px 12px; font-size: var(--text-xs);" />
-          </div>
-
-          <div class="flex flex-col gap-2">
-            <div class="card flex justify-between items-center" style="padding: 12px 16px; background: var(--bg-surface-hover);">
-              <div class="flex items-center gap-3">
-                <div style="color: var(--accent-primary);">${Icons.vault}</div>
-                <div>
-                  <div class="text-sm font-semibold">Netflix Streaming</div>
-                  <div class="text-xs text-muted">shared@family.com</div>
-                </div>
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="badge badge-champagne">Encrypted</span>
-                <button class="btn btn-icon btn-ghost btn-sm" title="Copy">${Icons.lock}</button>
-              </div>
-            </div>
-
-            <div class="card flex justify-between items-center" style="padding: 12px 16px; background: var(--bg-surface-hover);">
-              <div class="flex items-center gap-3">
-                <div style="color: var(--accent-secondary);">${Icons.diary}</div>
-                <div>
-                  <div class="text-sm font-semibold">Home Wi-Fi Network Key</div>
-                  <div class="text-xs text-muted">Secure Note</div>
-                </div>
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="badge badge-champagne">Encrypted</span>
-                <button class="btn btn-icon btn-ghost btn-sm" title="Copy">${Icons.lock}</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    `,
-    mount: () => {}
-  },
+  // 05. VAULT (PHASE 7 ZERO-KNOWLEDGE PASSWORD MANAGER)
+  vault: VaultModule,
 
   // 06. CLOUD (PHASE 6 MEGA CLOUD STORAGE)
   cloud: CloudModule,
@@ -285,35 +208,8 @@ export const Views = {
     mount: () => {}
   },
 
-  // 11. DOCUMENT LOCKER
-  documents: {
-    render: () => `
-      <div class="view-container">
-        <div class="card flex justify-between items-center" style="margin-bottom: var(--space-6);">
-          <div>
-            <div class="badge badge-champagne" style="margin-bottom: var(--space-2);">Encrypted Document Storage</div>
-            <h1 class="card-title" style="font-size: var(--text-xl);">GOSH Document Locker</h1>
-            <p class="text-muted">Passports, insurance, certificates, and confidential PDFs.</p>
-          </div>
-          <button class="btn btn-primary" onclick="window.Toast.info('Upload Document', 'Encrypted file handler active in Phase 7.')">
-            ${Icons.documents}
-            <span>Upload Document</span>
-          </button>
-        </div>
-
-        <div class="card">
-          <div class="empty-state">
-            <div class="empty-state-icon">${Icons.documents}</div>
-            <h3 class="card-title">Encrypted Document Vault</h3>
-            <p class="text-muted" style="max-width: 420px; margin-top: 6px;">
-              Sensitive PDFs and certificates are encrypted client-side prior to storage on MEGA.
-            </p>
-          </div>
-        </div>
-      </div>
-    `,
-    mount: () => {}
-  },
+  // 11. DOCUMENT LOCKER (PHASE 7 CONFIDENTIAL CERTIFICATES & DOCS)
+  documents: DocumentsModule,
 
   // 12. SMART SEARCH
   search: {

@@ -41,3 +41,8 @@
 | **Folder Hierarchy & CRUD** | Phase 6 Cloud | `node js/testing/cloud.test.js` (Test 2, 3, 8) | **PASS** | Folder created, renamed, navigated, and deleted with cascading cleanup. |
 | **File Upload & Progress** | Phase 6 Cloud | `node js/testing/cloud.test.js` (Test 4) | **PASS** | File upload progress dispatches to 100%; `mega_handle` persisted in database. |
 | **File Rename & Deletion** | Phase 6 Cloud | `node js/testing/cloud.test.js` (Test 6 & 7) | **PASS** | File rename updates record; delete frees storage quota immediately. |
+| **Password Generator & Strength** | Phase 7 Vault | `node js/testing/vault.test.js` (Test 1 & 2) | **PASS** | 24-char mixed set generated; strength algorithm evaluates entropy accurately. |
+| **Zero-Knowledge Key Derivation** | Phase 7 Vault | `node js/testing/vault.test.js` (Test 3, 4, 9) | **PASS** | Short/wrong passphrases rejected; 100k iteration PBKDF2 derives valid key. |
+| **Vault Zero-Plaintext Storage** | Phase 7 Vault | `node js/testing/vault.test.js` (Test 5 & 6) | **PASS** | Zero plaintext in database; unique 96-bit IV; authentic credentials restored. |
+| **Vault Auto-Lock & Memory Purge** | Phase 7 Vault | `node js/testing/vault.test.js` (Test 7 & 8) | **PASS** | Master Key wiped from volatile memory on lock; queries rejected while locked. |
+| **Confidential Document Locker** | Phase 7 Documents | `node js/testing/vault.test.js` (Test 10) | **PASS** | Document records linked to MEGA file handles; classified by category. |
