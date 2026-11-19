@@ -30,3 +30,10 @@
 | **Time & Greeting Utilities** | Phase 4 Dashboard | `node js/testing/dashboard.test.js` (Test 2 & 3) | **PASS** | Localized time greetings and humanized "time ago" verified. |
 | **Live Data Aggregation** | Phase 4 Dashboard | `node js/testing/dashboard.test.js` (Test 4) | **PASS** | Aggregated real data across `files`, `vault_items`, `calendar_events`, and `security_events`. |
 | **Dashboard Reactive Lifecycle** | Phase 4 Dashboard | `node js/testing/dashboard.test.js` (Test 5) | **PASS** | Auto-refresh listeners registered on mount and cleaned up on unmount. |
+| **AES-256-GCM Encryption** | Phase 5 Web Crypto | `node js/testing/connect.test.js` (Test 1) | **PASS** | Strong ciphertext; unique 96-bit IV; authentic plaintext restored. |
+| **Tamper Protection** | Phase 5 Security | `node js/testing/connect.test.js` (Test 2) | **PASS** | Tampered ciphertext rejected by AES-GCM authentication tag. |
+| **Encrypted Chat Sending** | Phase 5 Connect | `node js/testing/connect.test.js` (Test 3) | **PASS** | Encrypted message inserted and attributed to authorized user. |
+| **Message Quoting & Replies** | Phase 5 Connect | `node js/testing/connect.test.js` (Test 4) | **PASS** | Reply references parent message ID properly. |
+| **Message Editing & Deletion** | Phase 5 Connect | `node js/testing/connect.test.js` (Test 5 & 8) | **PASS** | Edited message marked and updated; deleted message permanently removed. |
+| **Emoji Reactions Sync** | Phase 5 Connect | `node js/testing/connect.test.js` (Test 6) | **PASS** | Reactions added, queried, and toggled in database. |
+| **Disappearing Messages TTL** | Phase 5 Connect | `node js/testing/connect.test.js` (Test 7) | **PASS** | Expired TTL messages automatically filtered; future messages retained. |

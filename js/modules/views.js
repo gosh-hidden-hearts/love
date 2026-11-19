@@ -10,6 +10,7 @@ import { Toast } from '../components/toast.js';
 import { AuthView } from './auth/auth.view.js';
 import { Auth } from '../services/auth.service.js';
 import { DashboardModule } from './dashboard/dashboard.module.js';
+import { ConnectModule } from './connect/connect.module.js';
 
 export const Views = {
   // 01. AUTHENTICATION VIEW (PHASE 2 MULTI-STEP FLOW)
@@ -18,78 +19,8 @@ export const Views = {
   // 02. HOME DASHBOARD (PHASE 4 LIVE TELEMETRY & FEEDS)
   home: DashboardModule,
 
-  // 03. CONNECT (MESSAGING)
-  connect: {
-    render: () => `
-      <div class="view-container flex flex-col" style="height: calc(100vh - var(--header-height) - 48px);">
-        <div class="card flex justify-between items-center" style="margin-bottom: var(--space-3); padding: var(--space-3) var(--space-5);">
-          <div class="flex items-center gap-3">
-            <div class="user-avatar-badge" style="background: var(--accent-primary-muted); border-color: var(--accent-primary); color: var(--accent-primary);">
-              G
-            </div>
-            <div>
-              <div class="text-sm font-semibold">GOSH Secure Room</div>
-              <div class="text-xs text-muted flex items-center gap-2">
-                <span class="status-dot"></span>
-                <span>End-to-End Encrypted Channel</span>
-              </div>
-            </div>
-          </div>
-          <div class="flex items-center gap-2">
-            <a href="#calls" class="btn btn-icon btn-ghost" title="Start Call">
-              ${Icons.calls}
-            </a>
-            <button class="btn btn-icon btn-ghost" onclick="window.Toast.info('Disappearing Messages', 'Configurable timers will be implemented in Phase 5.')" title="Disappearing Messages">
-              ${Icons.lock}
-            </button>
-          </div>
-        </div>
-
-        <!-- Chat Messages Container -->
-        <div class="card flex-1 flex flex-col justify-between" style="padding: var(--space-4); overflow: hidden;">
-          <div id="messages-list" style="flex: 1; overflow-y: auto; padding-right: var(--space-2); display: flex; flex-direction: column; gap: var(--space-3);">
-            <div class="text-center" style="margin: var(--space-4) 0;">
-              <span class="badge badge-champagne">Messages are secured with AES-256-GCM</span>
-            </div>
-
-            <!-- Example Message Received -->
-            <div class="flex items-start gap-3" style="max-width: 75%;">
-              <div class="user-avatar-badge" style="width: 28px; height: 28px; font-size: 10px;">P2</div>
-              <div>
-                <div style="background: var(--bg-surface-hover); border: 1px solid var(--border-subtle); padding: 10px 14px; border-radius: 4px 14px 14px 14px;">
-                  <p style="font-size: var(--text-sm); color: var(--text-primary); margin: 0;">Hey! Welcome to the new private GOSH platform. Everything we share here stays between us.</p>
-                </div>
-                <div class="text-xs text-muted" style="margin-top: 3px; margin-left: 4px;">10:24 AM</div>
-              </div>
-            </div>
-
-            <!-- Example Message Sent -->
-            <div class="flex items-start justify-end gap-3 self-end" style="max-width: 75%;">
-              <div>
-                <div style="background: var(--accent-primary-dark); border: 1px solid var(--accent-primary); padding: 10px 14px; border-radius: 14px 4px 14px 14px;">
-                  <p style="font-size: var(--text-sm); color: #ffffff; margin: 0;">Checked the vault and cloud storage too. Looks sleek, fast, and completely private!</p>
-                </div>
-                <div class="text-xs text-muted text-right" style="margin-top: 3px; margin-right: 4px;">10:25 AM • Read</div>
-              </div>
-              <div class="user-avatar-badge" style="width: 28px; height: 28px; font-size: 10px; background: var(--accent-primary);">Me</div>
-            </div>
-          </div>
-
-          <!-- Message Input Bar -->
-          <div class="flex items-center gap-2" style="margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border-subtle);">
-            <button class="btn btn-icon btn-secondary" title="Attach Media" onclick="window.Toast.info('Attachments', 'File upload via MEGA will be active in Phase 5.')">
-              ${Icons.cloud}
-            </button>
-            <input type="text" id="chat-input" class="input-field" placeholder="Type an encrypted message..." style="flex: 1;" />
-            <button class="btn btn-primary" onclick="window.Toast.success('GOSH Connect', 'Phase 5 will connect this to live Supabase Realtime.')">
-              <span>Send</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    `,
-    mount: () => {}
-  },
+  // 03. CONNECT (PHASE 5 LIVE E2EE CHAT, MEDIA & REACTIONS)
+  connect: ConnectModule,
 
   // 04. CALLS (WEBRTC)
   calls: {

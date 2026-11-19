@@ -56,7 +56,19 @@
   - Executed automated test suite (`js/testing/dashboard.test.js`) verifying 18/18 test assertions passed.
   - Status: **COMPLETED**
 
-- [ ] **PHASE 5 — GOSH Connect (Messaging)**
+- [x] **PHASE 5 — GOSH Connect (Messaging)**
+  - Implemented Web Cryptography API AES-256-GCM encryption service (`js/services/crypto.service.js`) with PBKDF2 key derivation and unique 96-bit IVs.
+  - Implemented real-time private messaging controller (`js/modules/connect/connect.module.js`).
+  - Implemented photo, video, and file attachment handling with encrypted payload storage.
+  - Implemented voice audio note recording via standard `MediaRecorder` API.
+  - Implemented emoji reactions (`❤️`, `👍`, `😂`, `😮`, `😢`, `🙏`) with reactive database sync.
+  - Implemented message reply/quoting, message editing (`(edited)` badge), and permanent message deletion.
+  - Implemented configurable disappearing messages (Off, 1h, 24h, 7d) with automatic TTL cleanup.
+  - Implemented in-chat message search filter.
+  - Executed automated test suite (`js/testing/connect.test.js`) verifying 16/16 test assertions passed.
+  - Status: **COMPLETED**
+
+- [ ] **PHASE 6 — GOSH Cloud (MEGA Integration)**
 - [x] **PHASE 4 — GOSH Home Dashboard & Telemetry**
   - Implemented live dashboard controller (`js/modules/dashboard/dashboard.module.js`) eliminating all placeholder/fake statistics.
   - Implemented real storage telemetry calculation aggregating actual file sizes against the 20 GB MEGA free tier quota.
@@ -68,8 +80,32 @@
   - Executed automated test suite (`js/testing/dashboard.test.js`) verifying 18/18 test assertions passed.
   - Status: **COMPLETED**
 
-- [ ] **PHASE 5 — GOSH Connect (Messaging)**
-- [ ] **PHASE 5 — GOSH Connect (Messaging)**
+- [x] **PHASE 5 — GOSH Connect (Messaging)**
+  - Implemented Web Cryptography API AES-256-GCM encryption service (`js/services/crypto.service.js`) with PBKDF2 key derivation and unique 96-bit IVs.
+  - Implemented real-time private messaging controller (`js/modules/connect/connect.module.js`).
+  - Implemented photo, video, and file attachment handling with encrypted payload storage.
+  - Implemented voice audio note recording via standard `MediaRecorder` API.
+  - Implemented emoji reactions (`❤️`, `👍`, `😂`, `😮`, `😢`, `🙏`) with reactive database sync.
+  - Implemented message reply/quoting, message editing (`(edited)` badge), and permanent message deletion.
+  - Implemented configurable disappearing messages (Off, 1h, 24h, 7d) with automatic TTL cleanup.
+  - Implemented in-chat message search filter.
+  - Executed automated test suite (`js/testing/connect.test.js`) verifying 16/16 test assertions passed.
+  - Status: **COMPLETED**
+
+- [ ] **PHASE 6 — GOSH Cloud (MEGA Integration)**
+- [x] **PHASE 5 — GOSH Connect (Messaging)**
+  - Implemented Web Cryptography API AES-256-GCM encryption service (`js/services/crypto.service.js`) with PBKDF2 key derivation and unique 96-bit IVs.
+  - Implemented real-time private messaging controller (`js/modules/connect/connect.module.js`).
+  - Implemented photo, video, and file attachment handling with encrypted payload storage.
+  - Implemented voice audio note recording via standard `MediaRecorder` API.
+  - Implemented emoji reactions (`❤️`, `👍`, `😂`, `😮`, `😢`, `🙏`) with reactive database sync.
+  - Implemented message reply/quoting, message editing (`(edited)` badge), and permanent message deletion.
+  - Implemented configurable disappearing messages (Off, 1h, 24h, 7d) with automatic TTL cleanup.
+  - Implemented in-chat message search filter.
+  - Executed automated test suite (`js/testing/connect.test.js`) verifying 16/16 test assertions passed.
+  - Status: **COMPLETED**
+
+- [ ] **PHASE 6 — GOSH Cloud (MEGA Integration)**
 - [ ] **PHASE 6 — GOSH Cloud (MEGA Integration)**
 - [ ] **PHASE 7 — GOSH Vault & Document Locker**
 - [ ] **PHASE 8 — GOSH Calls (WebRTC)**
