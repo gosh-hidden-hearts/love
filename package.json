@@ -4,13 +4,21 @@
   "description": "GOSH — Glimpse Of Soul Hearts: Premium Romantic Social Networking & Private Communication Application",
   "private": true,
   "scripts": {
+    "build": "npm --prefix frontend install && npm --prefix frontend run build",
+    "start": "node backend/src/server.js",
     "start:backend": "cd backend && npm run start",
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
     "build:frontend": "cd frontend && npm run build",
     "test:backend": "cd backend && npm run test"
   },
-  "keywords": ["gosh", "romantic-social-network", "private-messaging", "memory-vault", "webrtc"],
+  "keywords": [
+    "gosh",
+    "romantic-social-network",
+    "private-messaging",
+    "memory-vault",
+    "webrtc"
+  ],
   "author": "GOSH Team",
   "license": "ISC"
 }
