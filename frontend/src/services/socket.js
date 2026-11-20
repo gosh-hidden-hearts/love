@@ -13,8 +13,8 @@ class SocketService {
     }
 
     this.currentUser = user;
-    // In production or development with Vite proxy, connect to window.location.origin or port 5000
-    const serverUrl = window.location.hostname === 'localhost' ? 'http://localhost:5000' : window.location.origin;
+    // In production or development with Vite proxy, connect to VITE_SOCKET_URL, localhost:5000, or origin
+    const serverUrl = import.meta.env.VITE_SOCKET_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5000' : window.location.origin);
 
     this.socket = io(serverUrl, {
       transports: ['websocket', 'polling'],
