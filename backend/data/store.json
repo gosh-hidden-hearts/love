@@ -17,6 +17,15 @@
       "mobile_number": null,
       "email_verified": false,
       "created_at": "2026-11-20T16:22:23.968Z"
+    },
+    {
+      "id": "usr-1795193372869",
+      "firebase_uid": "Opqs4Cmj9tf7xolsv1WZV6WgR6y1",
+      "email": "gosh81416@gmail.com",
+      "username": "gosh81416",
+      "mobile_number": null,
+      "email_verified": false,
+      "created_at": "2026-11-20T16:49:32.869Z"
     }
   ],
   "profiles": [
@@ -37,14 +46,107 @@
       "created_at": "2026-11-20T16:22:23.968Z",
       "anniversary_date": "",
       "updated_at": "2026-11-20T16:24:10.614Z"
+    },
+    {
+      "user_id": "usr-1795193372869",
+      "display_name": "GOSH",
+      "avatar_url": "https://lh3.googleusercontent.com/a/ACg8ocKmAOyFmNs5q-NfurLM8VBy7BPuqFDKHfLf4DHXxqPf8qXYSw=s96-c",
+      "bio": "In a love story written by the stars ✨",
+      "relationship_status": "In a soul bond",
+      "created_at": "2026-11-20T16:49:32.869Z"
     }
   ],
   "identifiers": [],
   "settings": [],
   "conversations": [],
-  "messages": [],
-  "statuses": [],
+  "messages": [
+    {
+      "id": "msg-1795193383759",
+      "conversationId": "partner-demo",
+      "senderId": "usr-1795193372869",
+      "senderName": "GOSH",
+      "replyToId": null,
+      "replyToText": null,
+      "messageType": "text",
+      "content": "hello",
+      "mediaUrl": null,
+      "audioUrl": null,
+      "duration": null,
+      "deliveryStatus": "sent",
+      "createdAt": "2026-11-20T16:49:43.759Z"
+    },
+    {
+      "id": "msg-1795193431467",
+      "conversationId": "conv-usr-1795191743968",
+      "senderId": "usr-1795193372869",
+      "senderName": "GOSH",
+      "replyToId": null,
+      "replyToText": null,
+      "messageType": "text",
+      "content": "hello",
+      "mediaUrl": null,
+      "audioUrl": null,
+      "duration": null,
+      "deliveryStatus": "sent",
+      "createdAt": "2026-11-20T16:50:31.467Z"
+    },
+    {
+      "id": "msg-1795193456472",
+      "conversationId": "conv-usr-1795193372869",
+      "senderId": "usr-1795191743968",
+      "senderName": "prasanthgokul736",
+      "replyToId": null,
+      "replyToText": null,
+      "messageType": "text",
+      "content": "hello",
+      "mediaUrl": null,
+      "audioUrl": null,
+      "duration": null,
+      "deliveryStatus": "sent",
+      "createdAt": "2026-11-20T16:50:56.472Z"
+    },
+    {
+      "id": "msg-1795193465104",
+      "conversationId": "conv-usr-1795191743968",
+      "senderId": "usr-1795193372869",
+      "senderName": "GOSH",
+      "replyToId": null,
+      "replyToText": null,
+      "messageType": "text",
+      "content": "enna panura d",
+      "mediaUrl": null,
+      "audioUrl": null,
+      "duration": null,
+      "deliveryStatus": "sent",
+      "createdAt": "2026-11-20T16:51:05.104Z"
+    }
+  ],
+  "statuses": [
+    {
+      "id": "status-1795193534367",
+      "userId": "usr-1795193372869",
+      "userName": "GOSH",
+      "userAvatar": "https://lh3.googleusercontent.com/a/ACg8ocKmAOyFmNs5q-NfurLM8VBy7BPuqFDKHfLf4DHXxqPf8qXYSw=s96-c",
+      "type": "media",
+      "content": null,
+      "gradient": null,
+      "caption": null,
+      "mediaUrl": "/uploads/status_1795193534090.jpg",
+      "createdAt": "2026-11-20T16:52:14.367Z",
+      "viewsCount": 0,
+      "viewers": []
+    }
+  ],
   "calls": [
+    {
+      "id": "call-1795193515858",
+      "callerId": "usr-1795193372869",
+      "receiverId": "usr-1795191743968",
+      "callType": "video",
+      "callStatus": "ended",
+      "durationSeconds": 38,
+      "createdAt": "2026-11-20T16:51:55.858Z"
+    },
     {
       "id": "call-1795191231875",
       "callerId": "test-user-1",
@@ -77,6 +179,13 @@
       "accepted_at": "2026-11-20T16:22:39.806Z",
       "ip_address": "::1",
       "id": "terms-1795191760019"
+    },
+    {
+      "terms_version": "1.0.0",
+      "privacy_version": "1.0.0",
+      "accepted_at": "2026-11-20T16:48:57.267Z",
+      "ip_address": "::1",
+      "id": "terms-1795193337711"
     }
   ],
   "otp_verifications": [
