@@ -338,7 +338,7 @@ export const AuthView = {
       try {
         const idVal = loginIdentifier.value.trim();
         const passVal = loginPassword.value;
-        const remember = rememberBox ? rememberDevice.checked : true;
+        const remember = rememberDevice ? rememberDevice.checked : true;
 
         const result = await Auth.initiateLogin(idVal, passVal, remember);
         currentEmail = result.email;
