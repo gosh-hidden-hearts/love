@@ -1,20 +1,16 @@
 {
-  "name": "gosh",
+  "name": "gosh-app",
   "version": "1.0.0",
-  "description": "GOSH — Your Space. Your Stories. Complete Private Digital Platform",
+  "description": "GOSH — Glimpse Of Soul Hearts: Premium Romantic Social Networking & Private Communication Application",
   "private": true,
-  "type": "module",
   "scripts": {
-    "test": "node js/testing/auth.test.js && node js/testing/email.test.js && node js/testing/db.test.js && node js/testing/dashboard.test.js && node js/testing/connect.test.js && node js/testing/cloud.test.js && node js/testing/vault.test.js && node js/testing/calls.test.js && node js/testing/lifestyle.test.js && node js/testing/recovery.test.js && node js/testing/deployment.test.js && node js/testing/e2e_verification.test.js && node js/testing/public_auth_chat.test.js",
-    "cap:sync": "cap sync",
-    "cap:open": "cap open android"
+    "start:backend": "cd backend && npm run start",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build:frontend": "cd frontend && npm run build",
+    "test:backend": "cd backend && npm run test"
   },
-  "devDependencies": {
-    "@capacitor/android": "^6.0.0",
-    "@capacitor/cli": "^6.0.0",
-    "@capacitor/core": "^6.0.0"
-  },
-  "dependencies": {
-    "firebase": "^13.4.0"
-  }
+  "keywords": ["gosh", "romantic-social-network", "private-messaging", "memory-vault", "webrtc"],
+  "author": "GOSH Team",
+  "license": "ISC"
 }

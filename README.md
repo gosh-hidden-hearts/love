@@ -1,86 +1,203 @@
-# GOSH — Your Space. Your Stories.
-### Complete Private Digital Platform | Responsive Web + Android Application
+# GOSH — Glimpse Of Soul Hearts 🌹
 
-GOSH is a centralized, secure, private digital ecosystem engineered exclusively for exactly two authorized users. It unites end-to-end encrypted messaging, WebRTC audio/video calling, dedicated 20 GB MEGA cloud storage, a zero-knowledge password vault, a shared life journal, calendar, document locker, and device security management into a unified web and Android platform.
+> **A Private Digital World for Love, Communication, Sharing Memories, and Staying Connected.**
 
----
-
-## Key Principles & Pillars
-
-1. **Security & Privacy First:** Zero-knowledge architecture. Sensitive credentials, diary notes, and confidential documents are encrypted client-side using the Web Crypto API (`AES-256-GCM` with `PBKDF2-HMAC-SHA256`).
-2. **Strict Two-User Access Control:** Exactly two pre-authorized user identities (`prasanthgokul736@gmail.com` and `sharanyasiva4@gmail.com`). No public registration, no guest accounts, no demo credentials.
-3. **Verified Zero-Cost Infrastructure:** Powered exclusively by free tiers:
-   - **Frontend:** Pure HTML5 / CSS3 / Vanilla JavaScript on GitHub Pages ($0).
-   - **Identity:** Multi-step Email OTP and persistent device trust ($0).
-   - **Database & Realtime:** Supabase PostgreSQL with 100% Row Level Security ($0).
-   - **Storage:** Dedicated MEGA cloud account ($0 / 20 GB free tier).
-   - **Calling:** Peer-to-Peer WebRTC over Google public STUN ($0).
-   - **Android Packaging:** Open-source Capacitor ($0).
-4. **Zero-Build Constraint:** Pure HTML5, CSS3, and native ES Modules with zero compilation or bundler requirement for the web app.
+GOSH is an ultra-premium, production-grade romantic social networking and private communication web application. Built with a modern full-stack architecture, GOSH bridges intimate connections with end-to-end WebRTC calling, real-time messaging, status updates, an encrypted shared Memory Vault powered by MEGA Cloud Storage, and Google SMTP security.
 
 ---
 
-## 15 Integrated Modules
+## 📸 Key Features
 
-- **Module 01: GOSH Authentication & Identity** — Two-account whitelist, Email OTP verification, device fingerprinting, and session revocation.
-- **Module 02: GOSH Home Dashboard** — Real-time telemetry, 20 GB MEGA storage tracking, active vault status, upcoming events, and activity stream.
-- **Module 03: GOSH Connect** — Real-time private chat, E2EE photo/video attachments, MediaRecorder voice notes, emoji reactions, edit, delete, and disappearing messages TTL.
-- **Module 04: GOSH Calls** — Direct P2P WebRTC audio & HD video calling, Google STUN discovery, bidirectional screen sharing, duration timer, and call history DB persistence.
-- **Module 05: GOSH Vault** — Zero-knowledge AES-256-GCM password manager, PBKDF2 derivation, volatile memory key storage, 5-minute auto-lock, clipboard auto-purge, cryptographically secure password generator & strength meter.
-- **Module 06: GOSH Cloud** — Dedicated 20 GB MEGA storage with chunked upload progress, folder tree, streaming previews, and file management.
-- **Module 07: GOSH Memories** — Shared photo albums, milestone timeline with monthly dividers, hashtags, favorite filter, and new memory modals.
-- **Module 08: GOSH Diary** — Collaborative private journal with Web Crypto AES-256-GCM encryption, mood tags (`✨ Joyful`, `🌿 Peaceful`, etc.), date navigation, and zero plaintext storage.
-- **Module 09: GOSH Together** — Shared calendar with countdown badges ("In X days", "Tomorrow", "Today"), collaborative to-do checklist with live check/uncheck status, and 50/50 shared expense split calculator.
-- **Module 10: GOSH Music** — Curated shared playlists and streaming links (Spotify, YouTube, SoundCloud, Apple Music) with HTML5 audio playback and mini player HUD.
-- **Module 11: GOSH Document Locker** — Categorized, client-encrypted document storage for passports, health records, and certificates.
-- **Module 12: GOSH Smart Search** — Unified multi-module search engine indexing across Connect messages, cloud files, documents, memories, diary entries, calendar events, tasks, and vault items.
-- **Module 13: GOSH Device Manager** — Active sessions, device fingerprinting, individual session revocation, and "Revoke All Other Devices" emergency killswitch.
-- **Module 14: GOSH Recovery Center** — BIP-39 24-word emergency mnemonic generator/validator, encrypted JSON emergency recovery kit with SHA-256 integrity checksum, and Master Key rotation workflow.
-- **Module 15: GOSH Settings & Profile** — Authorized user profile, auto-lock timeout preferences, dark mode styling, and session logout.
+- **Application Entry Screen (WhatsApp-Inspired)**:
+  - Atmospheric dark romantic illustration with constellation artwork.
+  - Interactive Terms of Service & Privacy Policy acceptance modals.
+  - High-converting, bottom-positioned green "Agree and Continue" button that records acceptance timestamps and version metadata.
+
+- **Unified Multi-Identifier Authentication**:
+  - Secure login using **Registered Mobile Number**, **Personal Username**, or **Email Address**.
+  - Passwords authenticated securely via **Firebase Authentication**.
+  - **Google OAuth Sign-In** with single-click profile synchronization.
+  - **Google SMTP OTP Verification**: Real 6-digit cryptographic security codes dispatched directly to the user's Gmail using Google SMTP (`gosh81416@gmail.com`) for signups and password recovery.
+  - Password strength calculation & match indicators.
+
+- **Real-Time Messaging & Chat Sanctuary**:
+  - Contact discovery via phone number, username, or email.
+  - Real-time instant messaging using **Socket.io** and **Supabase Realtime**.
+  - Message bubble glassmorphism, read receipts (single/double ticks), date separators.
+  - Voice notes recorder powered by **MediaRecorder API** with audio waveform visualization.
+  - Emoji picker, media sharing (photos, videos, documents), message quoting, reactions (❤️, 😍, 😘, 🔥, 🥺, 👍), and deletion.
+  - Live typing indicator ("typing...") and online presence heartbeats.
+
+- **Status / Updates (24-Hour Ephemeral Stories)**:
+  - Text statuses with romantic gradient backgrounds and custom typography.
+  - Photo and video status uploads with captions.
+  - Full-screen interactive status viewer with automatic progress bars, pause on hold, tap-to-skip, viewer counts, and romantic quick replies.
+
+- **WebRTC Audio & Video Calling**:
+  - True peer-to-peer audio and video calls using the browser's native **WebRTC RTCPeerConnection**.
+  - Real-time signaling managed via backend Socket.io.
+  - Incoming call ringing modal with ringtone audio and Accept / Decline controls.
+  - In-call controls: Mic mute/unmute, Camera toggle, Screen sharing, picture-in-picture video stream, and call duration counter.
+  - Comprehensive call history log with one-click "Call Back" action.
+
+- **Shared Memory Vault (MEGA Cloud Storage)**:
+  - "Our Soul Sanctuary" — an encrypted shared media vault for couples.
+  - Real streaming uploads directly into **MEGA Cloud Storage** via backend integration.
+  - Date-wise timeline organization, photo/video/audio/document categorization, and custom albums (e.g., *First Date*, *Anniversary*, *Secret Love Letters*).
+  - Feelings tags (*Heartfelt*, *Sweet Moment*, *Dreamy*, *Special Day*).
+  - Full-screen lightbox preview and direct downloads.
+
+- **Passcode Vault & Security**:
+  - Secondary 4-digit PIN lock for sensitive private moments and memory spaces.
+  - Screen sharing permission testing.
+  - Complete profile customization (avatar, display name, handle, anniversary date, love bio).
 
 ---
 
-## Development Roadmap & Status (100% Complete)
+## 🛠️ Technical Stack
 
-- [x] **Phase 0:** Workspace Inspection & Zero-Cost Feasibility Report (Approved)
-- [x] **Phase 1:** Foundation, Design Tokens, Responsive App Shell & SPA Router (Approved)
-- [x] **Phase 2:** Authentication & Whitelist Integration (14/14 Tests Passed)
-- [x] **Phase 3:** PostgreSQL Database Schema & Row Level Security Policies (16/16 Tests Passed)
-- [x] **Phase 4:** Live Dashboard & Telemetry (18/18 Tests Passed)
-- [x] **Phase 5:** GOSH Connect (Messaging & E2EE Crypto) (16/16 Tests Passed)
-- [x] **Phase 6:** GOSH Cloud (MEGA Gateway Integration) (16/16 Tests Passed)
-- [x] **Phase 7:** GOSH Vault & Document Locker (AES-256-GCM) (22/22 Tests Passed)
-- [x] **Phase 8:** GOSH Calls (WebRTC & Screen Sharing) (35/35 Tests Passed)
-- [x] **Phase 9:** Lifestyle Modules (Memories, Diary, Together, Music, Search) (47/47 Tests Passed)
-- [x] **Phase 10:** Device Manager & Disaster Recovery Center (34/34 Tests Passed)
-- [x] **Phase 11:** GitHub Pages Deployment & Capacitor Android Packaging (30/30 Tests Passed)
-- [x] **Phase 12:** Dual-Device Comprehensive Verification & Full Platform Audit (37/37 Tests Passed)
-
-**Total Automated Test Coverage: 269 Passing Assertions, 0 Failures.**
+| Layer | Technologies |
+|---|---|
+| **Frontend** | React 18, Vite 6, Tailwind CSS, Lucide React, Socket.io-client, Canvas Confetti |
+| **Backend** | Node.js (v24), Express.js, Socket.io, Multer, Bcrypt, Dotenv, CORS |
+| **Database** | Supabase PostgreSQL & PostgREST (URL: `azwclorwxrzgofmribms.supabase.co`) |
+| **Authentication** | Firebase Authentication (Email/Password, Google OAuth) |
+| **Email Service** | Google SMTP with Gmail App Password (`gosh81416@gmail.com`) |
+| **Cloud Storage** | MEGA Cloud Storage (`megajs` server-side integration) |
+| **Realtime & Calling**| WebSockets (Socket.io) + WebRTC (RTCPeerConnection + Google STUN) |
 
 ---
 
-## Running the Automated Test Suites
+## 🚀 Getting Started
 
-```powershell
-# Run the complete test suite across all 15 modules:
-npm test
+### 1. Prerequisites
+- Node.js >= 18 (Tested on Node.js v24)
+- npm >= 9
+
+### 2. Installation
+```bash
+# Install backend dependencies
+cd backend
+npm install
+
+# Install frontend dependencies
+cd ../frontend
+npm install
+```
+
+### 3. Environment Configuration
+The backend `.env` file is already pre-configured with the project's verified credentials:
+```env
+PORT=5000
+NODE_ENV=development
+
+# Supabase
+SUPABASE_URL=https://azwclorwxrzgofmribms.supabase.co
+SUPABASE_KEY=sb_publishable_TzJoKCD-cPN6JLbgB_5K5g_H2nkq8YW
+
+# Google SMTP
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=gosh81416@gmail.com
+SMTP_PASS=qpyu ryqr asmf wypm
+SMTP_FROM="GOSH — Glimpse Of Soul Hearts" <gosh81416@gmail.com>
+
+# MEGA Cloud Storage
+MEGA_EMAIL=gosh81416@gmail.com
+MEGA_PASSWORD=Gokul@709
+```
+
+### 4. Running the Application
+
+#### Development Mode (Frontend & Backend)
+```bash
+# In terminal 1 (Backend API & Socket.io server):
+npm run dev:backend
+
+# In terminal 2 (Frontend Vite dev server with HMR on port 3000):
+npm run dev:frontend
+```
+
+#### Production Mode
+```bash
+# Build the frontend
+npm run build:frontend
+
+# Start the full-stack server (serves API and bundled React frontend on port 5000)
+npm run start:backend
+```
+
+Open your browser at `http://localhost:5000` (or `http://localhost:3000` in Vite dev mode).
+
+---
+
+## 🧪 Testing & Verification
+
+Comprehensive automated test suites are included:
+
+```bash
+# Run backend API integration tests
+cd backend
+node --test tests/api.test.js
+
+# Run Google SMTP OTP end-to-end verification test
+node --test tests/otp.test.js
+
+# Run MEGA Cloud Storage upload test
+node --test tests/mega.test.js
+```
+
+All suites execute and verify live credentials and functionality.
+
+---
+
+## 📁 Project Structure
+
+```
+GOSH/
+├── frontend/                     # React 18 + Vite + Tailwind CSS
+│   ├── src/
+│   │   ├── assets/               # Brand assets & romantic vectors
+│   │   ├── components/           # Reusable UI & Modals (Terms, Privacy)
+│   │   ├── contexts/             # AuthContext (Firebase) & CallContext (WebRTC)
+│   │   ├── layouts/              # DashboardLayout (Sidebar, Mobile Bar, Call HUD)
+│   │   ├── pages/                # AgreeContinue, Login, Signup, Chats, Status, Calls, Vault, Settings, Accounts
+│   │   ├── services/             # Firebase, Supabase, Socket.io, Backend API Client
+│   │   ├── styles/               # Romantic Dark Design System & Tailwind CSS
+│   │   ├── App.jsx               # Client Routing & Navigation Guards
+│   │   └── main.jsx
+│   ├── vite.config.js
+│   └── package.json
+│
+├── backend/                      # Node.js + Express + Socket.io Server
+│   ├── src/
+│   │   ├── config/               # Env, Supabase, Google SMTP, MEGA Storage
+│   │   ├── controllers/          # Auth, Users, Messages, Status, Vault, Calls, Settings
+│   │   ├── middleware/           # Auth validation & error handling
+│   │   ├── repositories/         # Supabase & resilient local data store
+│   │   ├── routes/               # Modular Express API routes
+│   │   ├── services/             # Google SMTP OTP, MEGA Cloud, WebRTC Realtime
+│   │   └── server.js             # HTTP + Socket.io Master Server
+│   ├── tests/                    # Automated integration & service tests
+│   └── package.json
+│
+├── database/
+│   └── migrations/               # 001_initial_schema.sql (PostgreSQL master schema)
+├── docs/                         # Technical architecture documentation
+├── .env.example
+├── package.json
+└── README.md
 ```
 
 ---
 
-## Deployment & Running Locally
+## 🔒 Security & Privacy Notes
 
-1. **Local Preview:**
-   Simply serve the root directory using any local HTTP static server:
-   ```powershell
-   npx serve .
-   ```
-2. **GitHub Pages Deployment:**
-   Pushing to `main` or `master` triggers `.github/workflows/deploy.yml` which deploys the static files directly to GitHub Pages with zero build step.
-3. **Android Capacitor:**
-   ```powershell
-   npm install
-   npx cap sync android
-   npx cap open android
-   ```
+- Plain-text passwords are never stored in the database. Authentication is mediated through Firebase Authentication.
+- All email OTPs are securely hashed using `bcrypt` and invalidated upon use or expiration.
+- Real-time media uploaded to the Memory Vault is routed and stored directly in MEGA Cloud Storage without exposing cloud credentials to the client.
+- WebRTC media streams are end-to-end encrypted peer-to-peer using DTLS-SRTP.
+
+---
+
+*GOSH (Glimpse Of Soul Hearts) — Crafted with love.*

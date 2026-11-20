@@ -1,0 +1,93 @@
+{
+  "users": [
+    {
+      "id": "usr-1795191231432",
+      "firebase_uid": "test-firebase-uid-123",
+      "email": "alex.gosh.test@example.com",
+      "username": "alexrivers",
+      "mobile_number": "+919876500001",
+      "email_verified": false,
+      "created_at": "2026-11-20T16:13:51.432Z"
+    },
+    {
+      "id": "usr-1795191743968",
+      "firebase_uid": "QOTD7xlBa9N1FKQMSUrWPg2dqjw1",
+      "email": "prasanthgokul736@gmail.com",
+      "username": "prasanthgokul736",
+      "mobile_number": null,
+      "email_verified": false,
+      "created_at": "2026-11-20T16:22:23.968Z"
+    }
+  ],
+  "profiles": [
+    {
+      "user_id": "usr-1795191231432",
+      "display_name": "Alex Rivers",
+      "avatar_url": "https://api.dicebear.com/7.x/adventurer/svg?seed=test-firebase-uid-123",
+      "bio": "In a love story written by the stars ✨",
+      "relationship_status": "In a soul bond",
+      "created_at": "2026-11-20T16:13:51.433Z"
+    },
+    {
+      "user_id": "usr-1795191743968",
+      "display_name": "prasanthgokul736",
+      "avatar_url": "https://api.dicebear.com/7.x/adventurer/svg?seed=QOTD7xlBa9N1FKQMSUrWPg2dqjw1",
+      "bio": "In a love story written by the stars ✨",
+      "relationship_status": "In a soul bond",
+      "created_at": "2026-11-20T16:22:23.968Z",
+      "anniversary_date": "",
+      "updated_at": "2026-11-20T16:24:10.614Z"
+    }
+  ],
+  "identifiers": [],
+  "settings": [],
+  "conversations": [],
+  "messages": [],
+  "statuses": [],
+  "calls": [
+    {
+      "id": "call-1795191231875",
+      "callerId": "test-user-1",
+      "receiverId": "test-user-2",
+      "callType": "video",
+      "callStatus": "ended",
+      "durationSeconds": 120,
+      "createdAt": "2026-11-20T16:13:51.875Z"
+    }
+  ],
+  "memories": [],
+  "terms_acceptance": [
+    {
+      "terms_version": "1.0.0",
+      "privacy_version": "1.0.0",
+      "accepted_at": "2026-11-20T16:13:49.490Z",
+      "ip_address": "::1",
+      "id": "terms-1795191230445"
+    },
+    {
+      "terms_version": "1.0.0",
+      "privacy_version": "1.0.0",
+      "accepted_at": "2026-11-20T16:21:07.979Z",
+      "ip_address": "::1",
+      "id": "terms-1795191668720"
+    },
+    {
+      "terms_version": "1.0.0",
+      "privacy_version": "1.0.0",
+      "accepted_at": "2026-11-20T16:22:39.806Z",
+      "ip_address": "::1",
+      "id": "terms-1795191760019"
+    }
+  ],
+  "otp_verifications": [
+    {
+      "id": "otp-1795191716630",
+      "email": "prasanthgokul736@gmail.com",
+      "otp_hash": "$2a$10$3HpCSFZ0L0cP5wuakQHWPO.jjDWmtbAN2nbmQXPKjjPXwlWA/rD1u",
+      "purpose": "signup",
+      "expires_at": "2026-11-20T16:31:56.448Z",
+      "is_used": true,
+      "created_at": "2026-11-20T16:21:56.630Z"
+    }
+  ]
+}

@@ -1,0 +1,1187 @@
+# GOSH — ULTRA MAX PRO MASTER DEVELOPMENT PROMPT
+
+## Project Identity
+
+**Application Name:** GOSH  
+**Full Name:** Glimpse Of Soul Hearts  
+**Project Type:** Premium Romantic Social Networking & Private Communication Web Application  
+**Primary Concept:** A private digital world for love, communication, sharing memories, and staying connected.
+
+You are an expert full-stack software architect, senior React developer, backend engineer, database architect, UI/UX designer, cybersecurity engineer, and QA automation engineer.
+
+Your task is to design, develop, test, and prepare a complete production-quality application named **GOSH (Glimpse Of Soul Hearts)**.
+
+This must be a real, functional full-stack application, not a static UI prototype.
+
+Do not skip features, create fake buttons, use mock data as a substitute for real backend functionality, or claim that something works without testing it.
+
+---
+
+# 1. TECHNICAL STACK
+
+Use the following technologies:
+
+### Frontend
+- HTML5
+- CSS3
+- JavaScript ES6+
+- React.js
+- Responsive component-based architecture.
+
+### Backend
+- Node.js
+- Express.js
+- Python for additional backend services where genuinely required.
+
+### Database
+- Supabase PostgreSQL
+- Supabase Realtime where appropriate.
+
+### Authentication
+- Firebase Authentication
+- Email and Password Authentication
+- Google OAuth Authentication
+- Server-side identity resolution for username and mobile-number login.
+
+### Email Service
+- Google SMTP
+- Gmail App Password stored securely in backend environment variables.
+- OTP generation, verification, expiration, and rate limiting.
+
+### Cloud Storage
+- MEGA Cloud Storage
+- Server-side integration only.
+- Upload, download, delete, and media retrieval.
+- Never expose MEGA credentials or private API tokens in frontend code.
+
+### Development Tools
+- Git and GitHub
+- Antigravity
+- VS Code compatible project structure.
+
+Use free-tier and zero-cost services wherever possible. Never introduce paid APIs, subscriptions, or infrastructure without explicit approval.
+
+---
+
+# 2. APPLICATION ENTRY SCREEN — AGREE AND CONTINUE
+
+The first screen must follow the supplied WhatsApp Agree and Continue screenshot as its visual reference.
+
+This screen must appear before Login and Signup.
+
+### Design
+- Full-screen dark background.
+- GOSH branding.
+- A beautiful original romantic communication illustration.
+- Minimalist, premium interface.
+- Privacy Policy link.
+- Terms of Service link.
+- Bottom-positioned green Agree and Continue button.
+
+### Interaction
+When the user clicks Agree and Continue:
+1. Validate acceptance of the terms.
+2. Record the applicable terms version and acceptance timestamp.
+3. Navigate to the authentication screen.
+
+Do not skip this screen for first-time users.
+
+---
+
+# 3. LOGIN & SIGNUP SYSTEM
+
+Create separate Login and Signup interfaces.
+
+## Login Page
+
+Required components:
+
+- GOSH logo and branding.
+- ID input.
+- Password input.
+- Show/Hide Password.
+- Login button.
+- Forgot Password.
+- Google Sign In.
+- Create New Account.
+
+### Login ID support
+
+Users must be able to log in using:
+- Registered mobile number.
+- Registered personal username.
+- Registered email address.
+
+All three identifiers must resolve securely to the corresponding Firebase account.
+
+Passwords must be verified using Firebase Authentication. Never store plain-text passwords in Supabase.
+
+## Signup Page
+
+Required fields:
+
+1. Gmail / Email ID — Mandatory.
+2. Password — Mandatory.
+3. Confirm Password — Mandatory.
+4. Mobile Number — Optional.
+5. Username — Optional.
+6. Personal Login ID — Optional if separately implemented.
+
+### Registration flow
+
+1. Validate the email.
+2. Validate password strength.
+3. Confirm that both passwords match.
+4. Check username and mobile uniqueness when supplied.
+5. Create Firebase account.
+6. Send email OTP using Google SMTP.
+7. Verify OTP.
+8. Create the corresponding Supabase profile.
+9. Initialize the user's account settings.
+10. Navigate to the application dashboard.
+
+Google signup must also be supported.
+
+### Forgot Password
+
+- Accept registered email or supported login identifier.
+- Resolve the account securely.
+- Generate a time-limited OTP.
+- Send OTP through Google SMTP.
+- Verify OTP.
+- Allow password reset.
+- Invalidate used or expired OTPs.
+
+Never reveal whether another person's account exists through error messages.
+
+---
+
+# 4. MAIN APPLICATION DASHBOARD
+
+After successful authentication, open the GOSH main dashboard.
+
+Use the supplied WhatsApp screenshots as functional and layout references.
+
+### Main navigation
+
+Mobile bottom navigation must contain:
+
+1. Chats
+2. Status
+3. Calls
+4. Memory Vault
+
+Settings and Accounts must have their own dedicated pages, accessible from the profile/menu area.
+
+### Desktop navigation
+
+Create a professional responsive desktop layout with:
+- Navigation sidebar.
+- Main content area.
+- Contextual panels.
+- Profile menu.
+- Notifications.
+- Search.
+
+### Visual theme
+
+Create a unique GOSH design identity.
+
+Recommended colors:
+- Background: Deep charcoal / near black.
+- Primary: Romantic rose pink.
+- Secondary: Deep purple.
+- Accent: Soft green.
+- Text: White and muted grey.
+
+Use:
+- Premium typography.
+- Smooth transitions.
+- Rounded cards.
+- Glassmorphism where appropriate.
+- Elegant icons.
+- Subtle animations.
+- Consistent spacing.
+
+The supplied screenshots' typography and dark appearance should guide the visual direction.
+
+Do not copy WhatsApp logos or pretend GOSH is WhatsApp. Build an original GOSH interface inspired by familiar messaging usability.
+
+---
+
+# 5. CHATS — COMPLETE MESSAGING SYSTEM
+
+This is one of the most important modules.
+
+Create a professional WhatsApp-inspired messaging interface.
+
+## Chat list
+
+Display:
+- Contact profile image.
+- Contact name.
+- Online indicator.
+- Last seen.
+- Last message preview.
+- Last message time.
+- Unread message count.
+- Message delivery indicators.
+
+Include:
+- Search contacts.
+- Search conversations.
+- New Chat.
+- Contact discovery.
+
+## Contact discovery
+
+Users must be able to find registered GOSH members using:
+- Mobile number.
+- Email address.
+- Username.
+
+If a registered user has supplied a mobile number in their profile, that number must be searchable even if they registered through Gmail.
+
+Where supported and explicitly permitted by the user, provide device contact access.
+
+Contact permissions must be requested transparently. Do not silently upload a user's entire address book.
+
+Users must be able to initiate conversations with discovered users according to their privacy settings.
+
+## Individual Chat Screen
+
+Implement:
+
+- Text messages.
+- Emoji picker.
+- Image sharing.
+- Video sharing.
+- Document attachments.
+- Voice recording.
+- Audio messages.
+- Message reply.
+- Message forwarding.
+- Message editing.
+- Message deletion.
+- Message reactions.
+- Copy message.
+- Message timestamps.
+- Sent status.
+- Delivered status.
+- Read receipts.
+- Typing indicator.
+- Online status.
+- Last seen.
+- Date separators.
+- Unread message separators.
+- Chat search.
+
+### Chat interface layout
+
+Header:
+- Back button.
+- Profile image.
+- Contact name.
+- Online / Last Seen.
+- Audio call.
+- Video call.
+- More options.
+
+Message area:
+- Left and right aligned message bubbles.
+- Media previews.
+- Voice message player.
+- Message timestamps.
+- Read receipts.
+
+Bottom composer:
+- Emoji.
+- Attachment.
+- Text input.
+- Camera.
+- Microphone.
+- Send button.
+
+Implement real-time messaging using secure backend APIs and Supabase Realtime.
+
+Messages must persist after refresh and across devices.
+
+---
+
+# 6. STATUS / UPDATES
+
+Create a WhatsApp-inspired Status experience.
+
+### Status features
+
+- Add Photo Status.
+- Add Video Status.
+- Add Text Status.
+- Add Caption.
+- Set Status Privacy.
+- View Other Users' Status.
+- Status Viewer.
+- Status View Count.
+- Viewer List.
+- Status Replies.
+- Status Reactions.
+- Status Expiration after 24 hours.
+
+### UI
+
+- Horizontal story cards.
+- Circular profile images.
+- Green/pink status rings.
+- Add Status card.
+- Viewed and unviewed indicators.
+- Full-screen status viewer.
+
+Store status metadata in Supabase and media in MEGA Cloud.
+
+Enforce status privacy and expiration on the server.
+
+---
+
+# 7. CALLS
+
+Create a dedicated Calls page.
+
+### Features
+
+- Audio Calls.
+- Video Calls.
+- Incoming Calls.
+- Outgoing Calls.
+- Missed Calls.
+- Call History.
+- Call Duration.
+- Call Time.
+- Call Status.
+- Call Back.
+
+### Advanced features
+
+- Microphone control.
+- Camera control.
+- Speaker control.
+- Call rejection.
+- Call termination.
+- Incoming call notification.
+- Permission handling.
+
+Use WebRTC for real-time audio and video communication.
+
+Use an appropriate secure signaling mechanism through the backend.
+
+Do not simulate successful calls if WebRTC connectivity has not been established.
+
+---
+
+# 8. MEMORY VAULT — SHARED DIGITAL MEMORY
+
+This is a special and important feature of GOSH.
+
+Create a beautiful shared memory gallery for authorized connected users.
+
+### Main interface
+
+- Memory Vault title.
+- Upload button.
+- Search.
+- Gallery layout.
+- Date-wise timeline.
+- Album organization.
+
+### Supported files
+
+- Photos.
+- Videos.
+- Audio recordings.
+- Documents.
+- Other explicitly supported file types.
+
+### Upload functionality
+
+Both authorized users must be able to upload memories.
+
+Every successfully uploaded shared memory must appear for the other authorized member in real time or after synchronization.
+
+### Memory management
+
+- View.
+- Download.
+- Delete with permission checks.
+- Preview.
+- Search.
+- Filter.
+- Create albums.
+- Add descriptions.
+- Add dates.
+- Show uploader identity.
+- Show upload date.
+
+### Important
+
+The shared Memory Vault must be separated from private personal storage.
+
+Only authorized members of the shared space can access shared memories.
+
+Implement appropriate file-size limits, file validation, access checks, and secure media retrieval.
+
+MEGA must be the actual cloud storage provider, not merely a frontend label.
+
+---
+
+# 9. SETTINGS PAGE
+
+Create a dedicated professional Settings interface.
+
+### General
+- Theme.
+- Language.
+- Notifications.
+- Sound.
+- Privacy preferences.
+
+### Account
+- Profile details.
+- Change email.
+- Change mobile number.
+- Change username.
+- Password management.
+- Account verification.
+
+### Privacy
+- Last Seen.
+- Online Visibility.
+- Profile Photo Visibility.
+- Status Privacy.
+- Read Receipts.
+- Blocked Users.
+- Contact Discovery.
+
+### Security
+- Two-step verification.
+- OTP security.
+- Active Sessions.
+- Login History.
+- Device Management.
+- Security Notifications.
+
+### Passcode Vault
+- Enable/Disable Passcode.
+- Set Passcode.
+- Change Passcode.
+- Unlock Vault.
+- Recovery process.
+
+Private vault content must be protected independently of ordinary account authentication.
+
+### Screen Sharing
+- Start Screen Sharing.
+- Stop Screen Sharing.
+- Explicit consent before sharing.
+- Show sharing status.
+- Secure permission handling.
+
+Use browser-supported screen-sharing APIs and never start sharing without user interaction and permission.
+
+### Additional
+- Storage and Data.
+- Help and Support.
+- Privacy Policy.
+- Terms of Service.
+- About GOSH.
+- Logout.
+- Delete Account.
+
+---
+
+# 10. ACCOUNTS PAGE
+
+Create a separate Accounts page.
+
+Include:
+- Personal Information.
+- Profile Photo.
+- Display Name.
+- Username.
+- Email Address.
+- Mobile Number.
+- Account ID.
+- Account Creation Date.
+- Verification Status.
+- Connected Devices.
+- Linked Google Account.
+- Change Password.
+- Manage Sessions.
+- Account Recovery.
+- Delete Account.
+
+All account updates must be validated and persisted securely.
+
+---
+
+# 11. USER PROFILE SYSTEM
+
+Every user must have a profile.
+
+Include:
+- Profile Picture.
+- Display Name.
+- Username.
+- Mobile Number.
+- Email.
+- Bio.
+- Online Status.
+- Last Seen.
+- Joined Date.
+- Shared Memories where access is authorized.
+
+Users must be able to edit their profile and configure privacy.
+
+---
+
+# 12. DATABASE ARCHITECTURE — SUPABASE
+
+Design a professional normalized PostgreSQL database.
+
+Create appropriate tables such as:
+
+1. users
+2. user_profiles
+3. user_identifiers
+4. user_settings
+5. user_devices
+6. contacts
+7. connections
+8. conversations
+9. conversation_members
+10. messages
+11. message_attachments
+12. message_receipts
+13. message_reactions
+14. statuses
+15. status_views
+16. status_reactions
+17. calls
+18. call_participants
+19. memory_spaces
+20. memory_members
+21. memory_files
+22. memory_albums
+23. notifications
+24. blocked_users
+25. otp_verifications
+26. login_sessions
+27. security_events
+28. terms_acceptance
+
+Add:
+- Primary keys.
+- Foreign keys.
+- Unique constraints.
+- Appropriate indexes.
+- Created and updated timestamps.
+- Database migrations.
+- Referential integrity.
+
+### Supabase security
+
+Implement Row Level Security (RLS).
+
+Every user must only access authorized data.
+
+For shared memories, only authorized memory-space members can access the files and metadata.
+
+For conversations, only conversation members can read messages.
+
+Never expose Supabase service-role keys in the frontend.
+
+---
+
+# 13. FIREBASE AUTHENTICATION ARCHITECTURE
+
+Use Firebase Authentication as the identity provider.
+
+Support:
+- Email and Password.
+- Google Authentication.
+- Password Reset.
+- Verified Email.
+- Secure session management.
+
+Create a secure mapping between Firebase UID and Supabase user ID.
+
+For mobile and username login:
+1. Accept identifier.
+2. Resolve identifier through a protected backend endpoint.
+3. Return the associated verified login email only through a safe authentication flow.
+4. Authenticate using Firebase.
+5. Never expose private account lookup data.
+
+Do not store passwords in Supabase.
+
+---
+
+# 14. GOOGLE SMTP & OTP SECURITY
+
+Implement SMTP through the backend.
+
+Environment variables:
+
+- SMTP_HOST
+- SMTP_PORT
+- SMTP_USER
+- SMTP_PASSWORD
+- SMTP_FROM
+
+Security rules:
+
+- OTP must be randomly generated.
+- OTP must expire.
+- OTP must be single-use.
+- OTP must be securely hashed before storage.
+- Apply resend limits.
+- Apply failed-attempt limits.
+- Apply rate limiting.
+- Never log OTP values or SMTP credentials.
+- Never expose SMTP credentials to React.
+
+Create professional GOSH-branded OTP emails.
+
+---
+
+# 15. MEGA CLOUD STORAGE INTEGRATION
+
+Implement actual MEGA Cloud integration.
+
+Required operations:
+- Upload.
+- Download.
+- Delete.
+- Retrieve media.
+- Organize folders.
+- Store metadata.
+- Associate media with users or shared memory spaces.
+
+All MEGA operations must occur through a protected backend service.
+
+Use a provider adapter so storage implementation can be tested independently.
+
+Before implementation, verify the currently supported MEGA API/SDK capabilities and authentication requirements.
+
+Do not invent unsupported API endpoints.
+
+Never place MEGA passwords, tokens, or private credentials in public frontend files or GitHub.
+
+If a particular MEGA operation cannot be reliably supported, report the limitation rather than pretending it works.
+
+---
+
+# 16. REAL-TIME SYSTEM
+
+Use Supabase Realtime or another appropriate real-time mechanism.
+
+Implement:
+- Online Presence.
+- Last Seen.
+- New Messages.
+- Typing Indicators.
+- Message Receipts.
+- Status Updates.
+- Memory Upload Notifications.
+- Call Signaling.
+- Account Notifications.
+
+Use heartbeats and sensible presence expiration.
+
+Do not mark users online permanently.
+
+Handle reconnection and network interruptions.
+
+---
+
+# 17. SECURITY & PRIVACY
+
+Security is a priority.
+
+Implement:
+- HTTPS-ready architecture.
+- Secure authentication.
+- Authorization checks.
+- Input validation.
+- Output sanitization.
+- API rate limiting.
+- Secure cookies where applicable.
+- CORS restrictions.
+- CSRF protection where applicable.
+- File upload validation.
+- MIME-type validation.
+- File-size restrictions.
+- Secure error handling.
+- Secrets management.
+- Database RLS.
+- Audit logging.
+
+For end-to-end encryption, design a separate encryption architecture for private messages and sensitive content.
+
+Do not claim end-to-end encryption unless key management, encryption, decryption, and multi-device behavior are genuinely implemented and tested.
+
+Never store sensitive secrets in frontend source code or GitHub.
+
+---
+
+# 18. UI/UX QUALITY REQUIREMENTS
+
+The entire application must look premium and professional.
+
+### Design requirements
+
+- Mobile-first responsive design.
+- Desktop and tablet support.
+- Dark romantic theme.
+- Premium icons.
+- Beautiful typography.
+- Smooth navigation.
+- Loading skeletons.
+- Empty states.
+- Error states.
+- Success notifications.
+- Confirmation dialogs.
+- Responsive modals.
+- Accessible controls.
+
+### Required design consistency
+
+All pages must use a shared design system.
+
+Create:
+- Color tokens.
+- Typography tokens.
+- Spacing tokens.
+- Border radius tokens.
+- Component variants.
+- Button styles.
+- Input styles.
+- Modal styles.
+- Navigation styles.
+
+Avoid inconsistent page designs.
+
+Do not make the application look like a generic admin dashboard.
+
+GOSH must feel like a premium communication and memories application.
+
+---
+
+# 19. PROJECT STRUCTURE
+
+Use a clean monorepo structure similar to:
+
+GOSH/
+│
+├── frontend/
+│   ├── public/
+│   └── src/
+│       ├── assets/
+│       ├── components/
+│       ├── pages/
+│       ├── layouts/
+│       ├── hooks/
+│       ├── contexts/
+│       ├── services/
+│       ├── utils/
+│       ├── styles/
+│       └── App.jsx
+│
+├── backend/
+│   ├── src/
+│   │   ├── config/
+│   │   ├── controllers/
+│   │   ├── middleware/
+│   │   ├── routes/
+│   │   ├── services/
+│   │   ├── repositories/
+│   │   ├── validators/
+│   │   └── server.js
+│   │
+│   └── tests/
+│
+├── python-services/
+│   ├── app/
+│   ├── requirements.txt
+│   └── tests/
+│
+├── database/
+│   ├── migrations/
+│   ├── policies/
+│   └── seed/
+│
+├── docs/
+├── tests/
+├── .env.example
+├── .gitignore
+├── README.md
+└── package.json
+
+You may improve this structure when necessary, but maintain clear separation of responsibilities.
+
+Do not introduce Python services that duplicate Node.js functionality without a real technical reason.
+
+---
+
+# 20. TESTING & QUALITY ASSURANCE
+
+Implement real tests.
+
+### Frontend
+- Component tests.
+- Navigation tests.
+- Form validation.
+- Responsive layout checks.
+
+### Backend
+- API tests.
+- Authentication tests.
+- Authorization tests.
+- Database integration tests.
+- Upload tests.
+- OTP tests.
+
+### End-to-End
+Test the following:
+
+1. First-time Agree and Continue.
+2. Signup.
+3. OTP verification.
+4. Login with email.
+5. Login with username.
+6. Login with mobile number.
+7. Forgot Password.
+8. Google Authentication.
+9. Profile updates.
+10. Contact discovery.
+11. Real-time messaging.
+12. Message persistence.
+13. Status upload and viewing.
+14. Audio and video calls.
+15. Memory Vault upload.
+16. Shared memory access.
+17. Unauthorized memory access prevention.
+18. Settings.
+19. Passcode Vault.
+20. Screen Sharing permissions.
+21. Logout and session handling.
+
+Fix bugs before marking a module complete.
+
+Do not claim tests passed if they were not executed.
+
+---
+
+# 21. DEVELOPMENT EXECUTION PLAN
+
+Build GOSH in controlled phases.
+
+### Phase 1 — Project Foundation
+- Inspect development environment.
+- Create project structure.
+- Configure React.
+- Configure Express.
+- Configure Supabase.
+- Configure Firebase.
+- Create the design system.
+
+### Phase 2 — UI Foundation
+- Agree and Continue screen.
+- Login page.
+- Signup page.
+- Main dashboard.
+- Navigation.
+- Responsive layout.
+
+### Phase 3 — Authentication
+- Firebase setup.
+- Google OAuth.
+- Username login.
+- Mobile login.
+- SMTP OTP.
+- Forgot Password.
+- Profile initialization.
+
+### Phase 4 — Messaging
+- Contacts.
+- Conversations.
+- Real-time messages.
+- Attachments.
+- Voice messages.
+- Receipts.
+- Typing indicators.
+
+### Phase 5 — Status
+- Status creation.
+- Media uploads.
+- Status viewer.
+- Privacy.
+- Expiration.
+
+### Phase 6 — Calls
+- WebRTC.
+- Signaling.
+- Audio calls.
+- Video calls.
+- Call history.
+
+### Phase 7 — Memory Vault
+- MEGA integration.
+- Uploads.
+- Gallery.
+- Albums.
+- Shared memory permissions.
+
+### Phase 8 — Accounts & Settings
+- Account management.
+- Security.
+- Passcode Vault.
+- Screen Sharing.
+- Privacy settings.
+
+### Phase 9 — Security & Testing
+- RLS.
+- API security.
+- Integration tests.
+- E2E tests.
+- Bug fixing.
+- Performance checks.
+
+### Phase 10 — Deployment Preparation
+- Production build.
+- Environment configuration.
+- GitHub integration.
+- Deployment configuration.
+- Documentation.
+
+---
+
+# 22. STRICT DEVELOPMENT RULES
+
+Follow these rules throughout development.
+
+1. Do not generate a fake prototype.
+2. Do not skip any requested module.
+3. Do not remove features without approval.
+4. Do not replace Supabase with Firebase Database.
+5. Do not replace MEGA with another storage provider without approval.
+6. Do not expose secrets in frontend code.
+7. Do not hardcode demo accounts.
+8. Do not use fake online indicators.
+9. Do not use simulated messaging in the production implementation.
+10. Do not create non-functional buttons.
+11. Do not claim deployment success without verification.
+12. Do not introduce paid services without approval.
+13. Preserve existing working code when modifying the project.
+14. Follow clean coding practices.
+15. Maintain proper error handling.
+16. Verify each completed development phase.
+
+### Working method
+
+Before changing an existing project:
+- Inspect all existing files.
+- Inspect package dependencies.
+- Inspect current database configuration.
+- Inspect existing authentication.
+- Identify existing bugs.
+- Prepare a development plan.
+
+Do not overwrite a working project blindly.
+
+Work phase by phase.
+
+After each phase:
+- Run the application.
+- Execute relevant tests.
+- Fix errors.
+- Provide a concise completion report.
+- List unfinished tasks and blockers.
+
+Never silently skip an incomplete requirement.
+
+---
+
+# 23. FINAL DELIVERY REQUIREMENTS
+
+The final GOSH application must contain:
+
+- Complete responsive frontend.
+- Working backend.
+- Firebase Authentication.
+- Supabase database.
+- Google SMTP OTP.
+- MEGA Cloud integration.
+- Real-time messaging.
+- Status functionality.
+- Audio and video calling.
+- Shared Memory Vault.
+- Accounts management.
+- Security settings.
+- Passcode Vault.
+- Screen Sharing.
+- Testing documentation.
+- Environment setup documentation.
+- GitHub-ready source code.
+- Deployment instructions.
+
+### Final Acceptance Criteria
+
+The project is complete only when:
+
+- Every required page exists.
+- Every implemented button works.
+- Authentication works.
+- Database operations persist.
+- Authorized users can communicate.
+- Shared memories synchronize correctly.
+- Unauthorized users cannot access private content.
+- The application works on mobile and desktop.
+- Critical tests pass.
+- All known limitations are documented.
+
+**FINAL INSTRUCTION:**
+
+Build GOSH as a complete, premium, secure, romantic communication platform.
+
+Prioritize functionality, privacy, reliability, maintainability, and excellent UI/UX.
+
+Think like a professional engineering team building a real product, not like an AI generating a quick demo.
+
+Start by auditing the current project and preparing the implementation plan. Do not claim completion until the acceptance criteria have been verified.
+
+
+
+Database
+
+Supabase PostgreSQL
+
+Supabase Realtime where appropriate.   ku 
+
+subabace api key : 1. Install package
+Run this command to install the required dependencies.
+Code:
+File: Code
+```
+npm install @supabase/supabase-js
+```
+
+2. Add files
+Add env variables, create a Supabase client, and use it in your app to query data.
+Code:
+File: .env.local
+```
+REACT_APP_SUPABASE_URL=https://azwclorwxrzgofmribms.supabase.co
+REACT_APP_SUPABASE_PUBLISHABLE_KEY=sb_publishable_TzJoKCD-cPN6JLbgB_5K5g_H2nkq8YW
+```
+
+File: utils/supabase.ts
+```
+1import { createClient } from "@supabase/supabase-js";
+2
+3const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+4const supabaseKey = process.env.REACT_APP_SUPABASE_PUBLISHABLE_KEY;
+5
+6export const supabase = createClient(supabaseUrl, supabaseKey);
+```
+
+File: App.tsx
+```
+1import { useState, useEffect } from 'react'
+2import { supabase } from './utils/supabase'
+3
+4export default function App() {
+5  const [todos, setTodos] = useState([])
+6
+7  useEffect(() => {
+8    async function getTodos() {
+9      const { data: todos } = await supabase.from('todos').select()
+10
+11      if (todos) {
+12        setTodos(todos)
+13      }
+14    }
+15
+16    getTodos()
+17  }, [])
+18
+19  return (
+20    <ul>
+21      {todos.map((todo) => (
+22        <li key={todo.id}>{todo.name}</li>
+23      ))}
+24    </ul>
+25  )
+26}
+```
+
+3. Install Agent Skills (optional)
+Agent Skills give AI coding tools ready-made instructions, scripts, and resources for working with Supabase more accurately and efficiently.
+Code:
+File: Code
+```
+npx skills add supabase/agent-skills
+```
+
+
+
+firebace : App nickname
+GOSH
+App ID 
+1:296346253080:web:95863a18f90c0f6882106d
+Linked Firebase Hosting site
+gosh-81416
+
+SDK setup and configuration
+
+npm
+
+CDN
+
+Config
+If you're already using npm and a module bundler such as webpack or Rollup, you can run the following command to install the latest SDK (Learn more):
+
+npm install firebase
+Then, initialize Firebase and begin using the SDKs for the products you'd like to use.
+
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyCSWH2rq6QMrG1sP1EU9a3ycyFU1Hv8-sg",
+  authDomain: "gosh-81416.firebaseapp.com",
+  projectId: "gosh-81416",
+  storageBucket: "gosh-81416.firebasestorage.app",
+  messagingSenderId: "296346253080",
+  appId: "1:296346253080:web:95863a18f90c0f6882106d",
+  measurementId: "G-VMWXV3NMFG"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+
+
+
+
+mega id : gosh81416@gmail.com
+mega pass :Gokul@709
+
+
+
+SMTP ID : gosh81416@gmail.com
+SMTP pass : qpyu ryqr asmf wypm
+
