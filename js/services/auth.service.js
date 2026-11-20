@@ -27,6 +27,7 @@ class AuthService {
   // 0. PUBLIC USER STORE & DIRECTORY
   initUsers() {
     let users = this.getAllUsers();
+    let updated = false;
     if (!users || users.length === 0) {
       users = [
         {
@@ -64,6 +65,66 @@ class AuthService {
           lastSeen: new Date().toISOString()
         }
       ];
+      updated = true;
+    } else {
+      // Ensure User 1 has the latest credentials requested by owner
+      let u1 = users.find(u => u.email === 'prasanthgokul736@gmail.com');
+      if (u1) {
+        if (u1.passwordHash !== 'Gokul@709') {
+          u1.passwordHash = 'Gokul@709';
+          updated = true;
+        }
+      } else {
+        users.push({
+          id: 'u1-auth-0000-0000-000000000001',
+          fullName: 'Gokul',
+          displayName: 'Gokul',
+          username: 'gokul',
+          email: 'prasanthgokul736@gmail.com',
+          phone: '+19876543210',
+          phoneVerified: true,
+          emailVerified: true,
+          role: 'owner',
+          avatar: '',
+          bio: 'Living in the moment. Building GOSH.',
+          passwordHash: 'Gokul@709',
+          createdAt: new Date().toISOString(),
+          online: true,
+          lastSeen: new Date().toISOString()
+        });
+        updated = true;
+      }
+
+      // Ensure User 2 has the latest credentials requested by owner
+      let u2 = users.find(u => u.email === 'sharanyasiva4@gmail.com');
+      if (u2) {
+        if (u2.passwordHash !== 'Sharanya@2008') {
+          u2.passwordHash = 'Sharanya@2008';
+          updated = true;
+        }
+      } else {
+        users.push({
+          id: 'u2-auth-0000-0000-000000000002',
+          fullName: 'Sharanya',
+          displayName: 'Sharanya',
+          username: 'sharanya',
+          email: 'sharanyasiva4@gmail.com',
+          phone: '+19876543211',
+          phoneVerified: true,
+          emailVerified: true,
+          role: 'owner',
+          avatar: '',
+          bio: 'Stories, memories, and dreams.',
+          passwordHash: 'Sharanya@2008',
+          createdAt: new Date().toISOString(),
+          online: true,
+          lastSeen: new Date().toISOString()
+        });
+        updated = true;
+      }
+    }
+
+    if (updated) {
       this.saveAllUsers(users);
     }
   }

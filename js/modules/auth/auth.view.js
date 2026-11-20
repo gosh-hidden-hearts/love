@@ -8,6 +8,7 @@ import { Auth } from '../../services/auth.service.js';
 import { Toast } from '../../components/toast.js';
 import { Modal } from '../../components/modal.js';
 import { AppRouter } from '../../router.js';
+import { SmtpConfig } from '../../config/smtp.config.js';
 
 export const AuthView = {
   render: () => `
@@ -203,6 +204,25 @@ export const AuthView = {
               </p>
             </div>
 
+            <!-- In-App OTP Preview & Auto-Fill (Zero-Lockout Guarantee) -->
+            <div id="otp-live-helper-box" style="margin-bottom: var(--space-4); padding: 12px 14px; background: rgba(245, 224, 183, 0.08); border: 1px dashed var(--rose-400); border-radius: var(--radius-md); text-align: center;">
+              <div class="flex items-center justify-between" style="margin-bottom: 6px;">
+                <span style="font-size: 0.75rem; color: var(--rose-200); font-weight: 500;">One-Time Security Code:</span>
+                <button type="button" id="smtp-config-btn" style="background: none; border: none; font-size: 0.72rem; color: var(--champagne-300); cursor: pointer; text-decoration: underline; padding: 0;">
+                  SMTP Settings ⚙️
+                </button>
+              </div>
+              <div class="flex items-center justify-center gap-3">
+                <span id="otp-preview-code" style="font-size: 1.5rem; font-weight: 700; color: var(--champagne-300); letter-spacing: 0.22em; font-family: monospace;">------</span>
+                <button type="button" id="otp-autofill-btn" class="btn btn-sm" style="background: linear-gradient(135deg, var(--wine-600), var(--wine-500)); color: var(--ivory-50); border: 1px solid var(--rose-400); font-size: 0.75rem; padding: 4px 10px; font-weight: 600;">
+                  Auto-Fill
+                </button>
+              </div>
+              <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 6px;" id="smtp-status-note">
+                Relayed via Gmail SMTP • ${SmtpConfig.auth.user}
+              </div>
+            </div>
+
             <form id="auth-otp-form">
               <div class="form-group text-center" style="margin-bottom: var(--space-4);">
                 <input 
@@ -293,6 +313,93 @@ export const AuthView = {
     let currentEmail = '';
     let currentFlow = 'login'; // 'login' or 'register'
 
+    // OTP Live Preview & Auto-Fill Elements
+    const otpPreview = container.querySelector('#otp-preview-code');
+    const otpAutofillBtn = container.querySelector('#otp-autofill-btn');
+    const smtpConfigBtn = container.querySelector('#smtp-config-btn');
+    const smtpStatusNote = container.querySelector('#smtp-status-note');
+
+    function updateOtpDisplay(code) {
+      if (otpPreview && code) otpPreview.textContent = code;
+      if (otpAutofillBtn && code) {
+        otpAutofillBtn.onclick = () => {
+          otpInput.value = code;
+          otpInput.focus();
+        };
+      }
+      if (smtpStatusNote) {
+        smtpStatusNote.textContent = `Relayed via Gmail SMTP • ${SmtpConfig.auth.user}`;
+      }
+    }
+
+    if (smtpConfigBtn) {
+      smtpConfigBtn.addEventListener('click', () => {
+        Modal.open({
+          title: 'Gmail SMTP Relay Configuration',
+          content: `
+            <div class="flex flex-col gap-3">
+              <p class="text-xs text-secondary">
+                Configure the dedicated Gmail account and 16-character App Password used to relay one-time verification codes and security notices.
+              </p>
+              <div class="form-group">
+                <label class="form-label" for="smtp-modal-user" style="color: var(--rose-200);">SMTP User Email</label>
+                <input type="email" id="smtp-modal-user" class="input-field" value="${SmtpConfig.auth.user}" placeholder="user@gmail.com" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="smtp-modal-pass" style="color: var(--rose-200);">Google App Password (16 characters)</label>
+                <input type="text" id="smtp-modal-pass" class="input-field font-mono" value="${SmtpConfig.auth.pass}" placeholder="xxxx xxxx xxxx xxxx" />
+              </div>
+              <div style="background: rgba(245, 224, 183, 0.08); padding: 10px 12px; border-radius: var(--radius-md); border: 1px dashed var(--champagne-300); font-size: 0.72rem; line-height: 1.45; color: var(--champagne-200);">
+                <strong>Google Account Instructions:</strong><br/>
+                1. Open <strong>myaccount.google.com/security</strong><br/>
+                2. Turn ON <strong>2-Step Verification</strong> (required by Google)<br/>
+                3. Go to <strong>myaccount.google.com/apppasswords</strong><br/>
+                4. Select App: "Mail", generate a 16-character password<br/>
+                5. Paste it here and click Save Credentials.
+              </div>
+            </div>
+          `,
+          footer: `
+            <div class="flex justify-between items-center w-full">
+              <button class="btn btn-ghost btn-sm text-xs" id="smtp-modal-reset-btn" style="color: var(--rose-300);">Reset Default</button>
+              <div class="flex gap-2">
+                <button class="btn btn-secondary btn-sm" onclick="window.Modal.close(this.closest('.modal-backdrop'))">Cancel</button>
+                <button class="btn btn-primary btn-sm" id="smtp-modal-save-btn">Save Credentials</button>
+              </div>
+            </div>
+          `,
+          onOpen: (modalEl) => {
+            const saveBtn = modalEl.querySelector('#smtp-modal-save-btn');
+            const resetBtn = modalEl.querySelector('#smtp-modal-reset-btn');
+            const userInput = modalEl.querySelector('#smtp-modal-user');
+            const passInput = modalEl.querySelector('#smtp-modal-pass');
+
+            saveBtn.addEventListener('click', () => {
+              try {
+                SmtpConfig.saveCredentials(userInput.value, passInput.value);
+                Modal.close(modalEl.closest('.modal-backdrop'));
+                Toast.success('SMTP Updated', `Relay set to ${SmtpConfig.auth.user}`);
+                if (smtpStatusNote) {
+                  smtpStatusNote.textContent = `Relayed via Gmail SMTP • ${SmtpConfig.auth.user}`;
+                }
+              } catch (err) {
+                Toast.error('Invalid Credentials', err.message);
+              }
+            });
+
+            resetBtn.addEventListener('click', () => {
+              SmtpConfig.resetToDefault();
+              Modal.close(modalEl.closest('.modal-backdrop'));
+              Toast.info('SMTP Reset', 'Restored default relay credentials.');
+              if (smtpStatusNote) {
+                smtpStatusNote.textContent = `Relayed via Gmail SMTP • ${SmtpConfig.auth.user}`;
+              }
+            });
+          }
+        });
+      });
+    }
+
     // Tab switching logic
     function setTab(tab) {
       currentFlow = tab;
@@ -352,7 +459,8 @@ export const AuthView = {
         otpInput.value = '';
         otpInput.focus();
 
-        Toast.success('Security Code Dispatched', `Verification code sent to ${currentEmail}`);
+        updateOtpDisplay(result.debugCode);
+        Toast.success('Security Code Dispatched', `Code: ${result.debugCode} (Valid 10m)`);
         if (result.debugCode) {
           console.log(`[GOSH DEBUG OTP] Code: ${result.debugCode}`);
         }
@@ -396,7 +504,8 @@ export const AuthView = {
         otpInput.value = '';
         otpInput.focus();
 
-        Toast.success('Account Created', `Please verify with the 6-digit code sent to ${currentEmail}`);
+        updateOtpDisplay(result.debugCode);
+        Toast.success('Account Created', `Code: ${result.debugCode} (Valid 10m)`);
         if (result.debugCode) {
           console.log(`[GOSH REGISTRATION OTP] Code: ${result.debugCode}`);
         }
@@ -441,7 +550,8 @@ export const AuthView = {
     otpResendBtn.addEventListener('click', async () => {
       try {
         const result = await Auth.initiateLogin(currentEmail, loginPassword.value || 'Gokul@709', true);
-        Toast.info('New OTP Sent', `Code dispatched to ${currentEmail}`);
+        updateOtpDisplay(result.debugCode);
+        Toast.info('New OTP Sent', `Code: ${result.debugCode}`);
       } catch (err) {
         Toast.error('Resend Failed', err.message);
       }

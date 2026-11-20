@@ -9,6 +9,7 @@ import { Toast } from '../../components/toast.js';
 import { Modal } from '../../components/modal.js';
 import { State } from '../../state.js';
 import { AppRouter } from '../../router.js';
+import { SmtpConfig } from '../../config/smtp.config.js';
 
 export const ProfileView = {
   render: () => {
@@ -135,6 +136,36 @@ export const ProfileView = {
               </div>
               <input type="checkbox" id="priv-lastseen-toggle" ${privacy.lastSeen ? 'checked' : ''} style="width: 18px; height: 18px; accent-color: var(--accent-primary);" />
             </label>
+          </div>
+        </div>
+
+        <!-- SMTP Email Relay & OTP Configuration -->
+        <div class="card" style="margin-bottom: var(--space-4); border: 1px solid var(--border-subtle);">
+          <div class="card-header" style="padding-bottom: var(--space-2); margin-bottom: var(--space-3); border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center;">
+            <h3 class="card-title" style="font-size: 0.95rem; color: var(--rose-200); font-weight: 600; margin: 0;">SMTP Email Relay & OTP Gateway</h3>
+            <span class="badge badge-champagne" style="font-size: 0.72rem;">Port 465 (SSL)</span>
+          </div>
+
+          <div class="flex flex-col gap-3">
+            <div class="flex justify-between items-center" style="padding: 4px 0;">
+              <div>
+                <div class="text-xs text-muted">Relay Account</div>
+                <div class="text-sm font-medium font-mono" id="profile-smtp-user" style="color: var(--text-primary);">${SmtpConfig.auth.user}</div>
+              </div>
+              <span class="badge badge-success flex items-center gap-1" style="font-size: 0.72rem; padding: 2px 8px;">
+                <span class="status-dot"></span> Active
+              </span>
+            </div>
+
+            <div class="flex justify-between items-center" style="padding: 4px 0; border-top: 1px solid var(--border-subtle);">
+              <div>
+                <div class="text-xs text-muted">SMTP Server</div>
+                <div class="text-sm font-medium" style="color: var(--text-primary);">${SmtpConfig.host}:${SmtpConfig.port}</div>
+              </div>
+              <button type="button" id="profile-smtp-config-btn" class="btn btn-secondary btn-sm" style="font-size: 0.78rem; padding: 4px 12px;">
+                Configure SMTP ⚙️
+              </button>
+            </div>
           </div>
         </div>
 
@@ -281,5 +312,80 @@ export const ProfileView = {
 
     if (editBtn) editBtn.addEventListener('click', openEditModal);
     if (avatarBtn) avatarBtn.addEventListener('click', openEditModal);
+
+    // SMTP Configuration Modal Handler
+    const smtpBtn = container.querySelector('#profile-smtp-config-btn');
+    if (smtpBtn) {
+      smtpBtn.addEventListener('click', () => {
+        Modal.open({
+          title: 'Gmail SMTP Relay Settings',
+          content: `
+            <div class="flex flex-col gap-3">
+              <div class="form-group">
+                <label class="form-label" style="font-size: 0.8rem; color: var(--rose-200);">SMTP Host</label>
+                <input type="text" id="prof-smtp-modal-host" class="input-field font-mono" value="${SmtpConfig.host}" placeholder="smtp.gmail.com" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" style="font-size: 0.8rem; color: var(--rose-200);">SMTP Port (SSL)</label>
+                <input type="number" id="prof-smtp-modal-port" class="input-field font-mono" value="${SmtpConfig.port}" placeholder="465" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" style="font-size: 0.8rem; color: var(--rose-200);">Sender Gmail Address</label>
+                <input type="email" id="prof-smtp-modal-user" class="input-field font-mono" value="${SmtpConfig.auth.user}" placeholder="your-email@gmail.com" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" style="font-size: 0.8rem; color: var(--rose-200);">Google App Password (16 characters)</label>
+                <input type="text" id="prof-smtp-modal-pass" class="input-field font-mono" value="${SmtpConfig.auth.pass}" placeholder="xxxx xxxx xxxx xxxx" />
+              </div>
+              <div style="background: rgba(245, 224, 183, 0.08); padding: 10px 12px; border-radius: var(--radius-md); border: 1px dashed var(--champagne-300); font-size: 0.72rem; line-height: 1.45; color: var(--champagne-200);">
+                <strong>Google Account Instructions:</strong><br/>
+                1. Open <strong>myaccount.google.com/security</strong><br/>
+                2. Turn ON <strong>2-Step Verification</strong> (required by Google)<br/>
+                3. Go to <strong>myaccount.google.com/apppasswords</strong><br/>
+                4. Select App: "Mail", generate a 16-character password<br/>
+                5. Paste it here and click Save Credentials.
+              </div>
+            </div>
+          `,
+          footer: `
+            <div class="flex justify-between items-center w-full">
+              <button class="btn btn-ghost btn-sm text-xs" id="prof-smtp-modal-reset-btn" style="color: var(--rose-300);">Reset Default</button>
+              <div class="flex gap-2">
+                <button class="btn btn-secondary btn-sm" onclick="window.Modal.close(this.closest('.modal-backdrop'))">Cancel</button>
+                <button class="btn btn-primary btn-sm" id="prof-smtp-modal-save-btn">Save Credentials</button>
+              </div>
+            </div>
+          `,
+          onOpen: (modalEl) => {
+            const saveBtn = modalEl.querySelector('#prof-smtp-modal-save-btn');
+            const resetBtn = modalEl.querySelector('#prof-smtp-modal-reset-btn');
+            const userInput = modalEl.querySelector('#prof-smtp-modal-user');
+            const passInput = modalEl.querySelector('#prof-smtp-modal-pass');
+            const hostInput = modalEl.querySelector('#prof-smtp-modal-host');
+            const portInput = modalEl.querySelector('#prof-smtp-modal-port');
+
+            saveBtn.addEventListener('click', () => {
+              try {
+                SmtpConfig.saveCredentials(userInput.value, passInput.value, hostInput.value, portInput.value);
+                Modal.close(modalEl.closest('.modal-backdrop'));
+                Toast.success('SMTP Updated', `Relay set to ${SmtpConfig.auth.user}`);
+                const userEl = container.querySelector('#profile-smtp-user');
+                if (userEl) userEl.textContent = SmtpConfig.auth.user;
+              } catch (err) {
+                Toast.error('Invalid Credentials', err.message);
+              }
+            });
+
+            resetBtn.addEventListener('click', () => {
+              SmtpConfig.resetToDefault();
+              Modal.close(modalEl.closest('.modal-backdrop'));
+              Toast.info('SMTP Reset', 'Restored default relay credentials.');
+              const userEl = container.querySelector('#profile-smtp-user');
+              if (userEl) userEl.textContent = SmtpConfig.auth.user;
+            });
+          }
+        });
+      });
+    }
   }
 };

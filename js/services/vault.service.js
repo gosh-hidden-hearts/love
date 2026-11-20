@@ -219,22 +219,41 @@ class VaultService {
     const charsNumbers = '0123456789';
     const charsSymbols = '!@#$%^&*()_+~|}{[]:;?><,.-=';
 
+    const required = [];
     let pool = '';
-    if (uppercase) pool += charsUpper;
-    if (lowercase) pool += charsLower;
-    if (numbers) pool += charsNumbers;
-    if (symbols) pool += charsSymbols;
+    if (uppercase) { pool += charsUpper; required.push(charsUpper); }
+    if (lowercase) { pool += charsLower; required.push(charsLower); }
+    if (numbers) { pool += charsNumbers; required.push(charsNumbers); }
+    if (symbols) { pool += charsSymbols; required.push(charsSymbols); }
 
-    if (!pool) pool = charsLower + charsNumbers;
+    if (!pool) {
+      pool = charsLower + charsNumbers;
+      required.push(charsLower, charsNumbers);
+    }
 
-    const randomBuffer = new Uint32Array(length);
+    const randomBuffer = new Uint32Array(length + required.length + 10);
     crypto.getRandomValues(randomBuffer);
 
-    let password = '';
-    for (let i = 0; i < length; i++) {
-      password += pool[randomBuffer[i] % pool.length];
+    const chars = [];
+    // Ensure at least one character from each selected set is guaranteed
+    required.forEach((set, idx) => {
+      chars.push(set[randomBuffer[idx] % set.length]);
+    });
+
+    // Fill remaining length from full pool
+    for (let i = chars.length; i < length; i++) {
+      chars.push(pool[randomBuffer[i] % pool.length]);
     }
-    return password;
+
+    // Cryptographic Fisher-Yates shuffle
+    const shuffleBuffer = new Uint32Array(chars.length);
+    crypto.getRandomValues(shuffleBuffer);
+    for (let i = chars.length - 1; i > 0; i--) {
+      const j = shuffleBuffer[i] % (i + 1);
+      [chars[i], chars[j]] = [chars[j], chars[i]];
+    }
+
+    return chars.slice(0, length).join('');
   }
 
   // 10. PASSWORD STRENGTH METER
