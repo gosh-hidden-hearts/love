@@ -3,77 +3,132 @@
 @tailwind utilities;
 
 :root {
-  --color-romantic-bg: #0c0d14;
-  --color-romantic-surface: #151724;
-  --color-romantic-card: #1c1e30;
+  --color-romantic-bg: #08090e;
+  --color-romantic-surface: #0f111a;
+  --color-romantic-card: #141724;
+  --color-romantic-panel: #1a1d2e;
   --color-romantic-pink: #f43f5e;
   --color-romantic-purple: #3b0764;
   --color-romantic-green: #25d366;
 }
 
-body {
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
   margin: 0;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: #0c0d14;
+  padding: 0;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: #08090e;
   color: #f8fafc;
   overflow-x: hidden;
-  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
+  touch-action: manipulation;
+}
+
+/* Safe area insets for Android & iOS gestures and camera notches */
+.pb-safe {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+}
+
+.pt-safe {
+  padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
+}
+
+.pl-safe {
+  padding-left: max(0.5rem, env(safe-area-inset-left, 0px));
+}
+
+.pr-safe {
+  padding-right: max(0.5rem, env(safe-area-inset-right, 0px));
 }
 
 /* Custom romantic scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(15, 17, 26, 0.6);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(244, 63, 94, 0.25);
+  background: rgba(244, 63, 94, 0.3);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(244, 63, 94, 0.5);
+  background: rgba(244, 63, 94, 0.6);
 }
 
 /* Glassmorphism helpers */
 .glass-panel {
-  background: rgba(21, 23, 36, 0.75);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 17, 26, 0.82);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .glass-card {
-  background: rgba(28, 30, 48, 0.65);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(20, 23, 36, 0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+.glass-card-hover {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card-hover:hover {
+  background: rgba(26, 29, 46, 0.85);
+  border-color: rgba(244, 63, 94, 0.3);
+  box-shadow: 0 8px 30px -5px rgba(244, 63, 94, 0.15);
+  transform: translateY(-2px);
+}
+
 .glass-input {
-  background: rgba(12, 13, 20, 0.65);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(10, 11, 18, 0.75);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #f8fafc;
 }
 
 .glass-input:focus {
   border-color: rgba(244, 63, 94, 0.6);
-  box-shadow: 0 0 15px rgba(244, 63, 94, 0.25);
+  box-shadow: 0 0 18px rgba(244, 63, 94, 0.25);
+  outline: none;
+}
+
+/* Romantic Chat Bubbles */
+.chat-bubble-outgoing {
+  background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+  color: #ffffff;
+  border-radius: 18px 18px 4px 18px;
+  box-shadow: 0 4px 18px -2px rgba(244, 63, 94, 0.35);
+}
+
+.chat-bubble-incoming {
+  background: rgba(26, 29, 46, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #f1f5f9;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px 18px 18px 4px;
 }
 
 /* Gradient text */
 .text-romantic-gradient {
-  background: linear-gradient(135deg, #fb7185 0%, #f43f5e 50%, #c084fc 100%);
+  background: linear-gradient(135deg, #fb7185 0%, #f43f5e 45%, #c084fc 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .text-gold-gradient {
-  background: linear-gradient(135deg, #fde047 0%, #eab308 100%);
+  background: linear-gradient(135deg, #fde047 0%, #f59e0b 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -82,17 +137,29 @@ body {
 .btn-romantic-primary {
   background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
   color: white;
-  box-shadow: 0 4px 20px -2px rgba(244, 63, 94, 0.4);
+  box-shadow: 0 4px 22px -2px rgba(244, 63, 94, 0.45);
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .btn-romantic-primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 25px -2px rgba(244, 63, 94, 0.6);
+  box-shadow: 0 6px 28px -2px rgba(244, 63, 94, 0.65);
 }
 
 .btn-romantic-primary:active {
   transform: translateY(0);
+}
+
+.btn-romantic-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  color: #f1f5f9;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+}
+
+.btn-romantic-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(244, 63, 94, 0.3);
 }
 
 .btn-romantic-green {
@@ -110,11 +177,22 @@ body {
 /* Animations */
 @keyframes heartFloat {
   0% { transform: translateY(0) scale(0.9); opacity: 0; }
-  20% { opacity: 0.8; }
-  80% { opacity: 0.8; }
-  100% { transform: translateY(-70px) scale(1.15); opacity: 0; }
+  20% { opacity: 0.9; }
+  80% { opacity: 0.9; }
+  100% { transform: translateY(-75px) scale(1.2); opacity: 0; }
 }
 
 .floating-heart {
   animation: heartFloat 2.5s ease-out forwards;
+}
+
+/* Custom chat wallpaper pattern */
+.chat-wallpaper-romantic {
+  background-color: #08090e;
+  background-image: 
+    radial-gradient(circle at 20% 30%, rgba(244, 63, 94, 0.05) 0%, transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(168, 85, 247, 0.05) 0%, transparent 40%),
+    linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
 }

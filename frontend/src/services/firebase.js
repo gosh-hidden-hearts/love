@@ -4,6 +4,8 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider, 
   signOut, 
   sendPasswordResetEmail,
@@ -24,13 +26,20 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+
 export const googleProvider = new GoogleAuthProvider();
+// Force account picker prompt to ensure popups do not stall on stale accounts
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
 
 export {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithPopup,
-  signOut,
+  signInWithRedirect,
+  getRedirectResult,
+  signOut, 
   sendPasswordResetEmail,
   updateProfile,
   onAuthStateChanged

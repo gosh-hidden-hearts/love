@@ -38,6 +38,12 @@ jobs:
       - name: Build Frontend
         working-directory: frontend
         run: npm run build
+        env:
+          VITE_BASE_PATH: /love/
+          VITE_API_URL: ${{ secrets.VITE_API_URL || vars.VITE_API_URL }}
+          VITE_SOCKET_URL: ${{ secrets.VITE_SOCKET_URL || vars.VITE_SOCKET_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL || 'https://azwclorwxrzgofmribms.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY || 'sb_publishable_TzJoKCD-cPN6JLbgB_5K5g_H2nkq8YW' }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

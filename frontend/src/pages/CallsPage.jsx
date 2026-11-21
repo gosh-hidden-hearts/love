@@ -149,6 +149,7 @@ export default function CallsPage() {
             filteredLogs.map((log) => {
               const isMissed = log.status === 'missed';
               const isIncoming = log.direction === 'incoming';
+              const targetPartnerId = log.partnerId || (log.callerId === user?.id ? log.receiverId : log.callerId);
 
               return (
                 <div
@@ -204,7 +205,7 @@ export default function CallsPage() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => startCall({
-                        receiverId: log.callerId,
+                        receiverId: targetPartnerId,
                         receiverName: log.partnerName,
                         receiverAvatar: log.partnerAvatar,
                         type: 'audio'
@@ -217,7 +218,7 @@ export default function CallsPage() {
 
                     <button
                       onClick={() => startCall({
-                        receiverId: log.callerId,
+                        receiverId: targetPartnerId,
                         receiverName: log.partnerName,
                         receiverAvatar: log.partnerAvatar,
                         type: 'video'

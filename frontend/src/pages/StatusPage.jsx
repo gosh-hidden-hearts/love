@@ -14,7 +14,9 @@ import {
   Clock, 
   ChevronRight,
   Shield,
-  Palette
+  Palette,
+  Trash2,
+  Check
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
@@ -46,7 +48,12 @@ export default function StatusPage() {
   const [mediaFile, setMediaFile] = useState(null);
   const [mediaPreview, setMediaPreview] = useState(null);
   const [caption, setCaption] = useState('');
+  const [privacy, setPrivacy] = useState('contacts'); // 'contacts' | 'everyone' | 'partner_only'
   const [uploading, setUploading] = useState(false);
+
+  // Status Reply State
+  const [replyText, setReplyText] = useState('');
+  const [isReplying, setIsReplying] = useState(false);
 
   // Load Statuses
   useEffect(() => {
@@ -115,9 +122,48 @@ export default function StatusPage() {
     setActiveStoryViewer(storyList[index]);
     setStoryIndex(index);
     setStoryProgress(0);
+    setReplyText('');
     // Mark as viewed in backend
     if (user && storyList[index]?.id) {
-      api.markStatusViewed(storyList[index].id, user.id).catch(console.warn);
+      api.markStatusViewed(storyList[index].id, user.id, user.displayName).catch(console.warn);
+    }
+  };
+
+  const handleDeleteStatus = async (statusId) => {
+    if (window.confirm('Delete this status update permanently?')) {
+      try {
+        await api.deleteStatus(statusId);
+        setMyStatuses((prev) => prev.filter((s) => s.id !== statusId));
+        setStatuses((prev) => prev.filter((s) => s.id !== statusId));
+        setActiveStoryViewer(null);
+      } catch (err) {
+        console.error('Failed to delete status:', err);
+      }
+    }
+  };
+
+  const handleSendStatusReply = async () => {
+    if (!replyText.trim() || !activeStoryViewer || isReplying) return;
+    setIsReplying(true);
+    try {
+      const summary = activeStoryViewer.type === 'media'
+        ? 'photo glimpse'
+        : `"${activeStoryViewer.content?.slice(0, 35)}..."`;
+      const replyMessage = `❤️ Replied to your status (${summary}):\n${replyText.trim()}`;
+
+      await api.sendMessage({
+        senderId: user?.id,
+        receiverId: activeStoryViewer.userId,
+        content: replyMessage,
+        messageType: 'text'
+      });
+
+      setReplyText('');
+      setActiveStoryViewer(null);
+    } catch (e) {
+      console.warn('Failed to send status reply:', e);
+    } finally {
+      setIsReplying(false);
     }
   };
 
@@ -159,6 +205,7 @@ export default function StatusPage() {
       formData.append('userName', user?.displayName || 'Me');
       formData.append('userAvatar', user?.avatarUrl || '');
       formData.append('statusType', statusType);
+      formData.append('privacy', privacy);
 
       if (statusType === 'text') {
         formData.append('content', textContent);
@@ -352,12 +399,23 @@ export default function StatusPage() {
                 </div>
               </div>
 
-              <button
-                onClick={() => setActiveStoryViewer(null)}
-                className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                {activeStoryViewer.userId === user?.id && (
+                  <button
+                    onClick={() => handleDeleteStatus(activeStoryViewer.id)}
+                    className="p-2 rounded-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 transition"
+                    title="Delete Status"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                )}
+                <button
+                  onClick={() => setActiveStoryViewer(null)}
+                  className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -416,22 +474,29 @@ export default function StatusPage() {
                 </div>
               </div>
             ) : (
-              <div className="flex items-center gap-2">
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSendStatusReply();
+                }}
+                className="flex items-center gap-2"
+              >
                 <input
                   type="text"
-                  placeholder="Send a romantic reply..."
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  placeholder="Send a romantic reply to chat..."
                   className="flex-1 py-3 px-4 rounded-full glass-input text-xs text-white placeholder-slate-400 focus:outline-none"
                 />
                 <button 
-                  onClick={() => {
-                    alert('Reply sent to partner!');
-                    setActiveStoryViewer(null);
-                  }}
-                  className="p-3 rounded-full btn-romantic-primary text-white"
+                  type="submit"
+                  disabled={!replyText.trim() || isReplying}
+                  className="p-3 rounded-full btn-romantic-primary text-white disabled:opacity-50 transition"
+                  title="Send Reply"
                 >
-                  <Heart className="w-4 h-4 fill-white" />
+                  <Send className="w-4 h-4" />
                 </button>
-              </div>
+              </form>
             )}
           </div>
         </div>
@@ -540,6 +605,22 @@ export default function StatusPage() {
                   />
                 </>
               )}
+
+              {/* Status Privacy Selector */}
+              <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5 text-xs">
+                <span className="text-slate-400 flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-rose-400" /> Who can see this?
+                </span>
+                <select
+                  value={privacy}
+                  onChange={(e) => setPrivacy(e.target.value)}
+                  className="bg-transparent text-rose-300 font-medium focus:outline-none cursor-pointer"
+                >
+                  <option value="contacts" className="bg-[#151724] text-white">Contacts Only</option>
+                  <option value="partner_only" className="bg-[#151724] text-white">Soul Bond Only ❤️</option>
+                  <option value="everyone" className="bg-[#151724] text-white">Everyone</option>
+                </select>
+              </div>
 
               <button
                 type="submit"

@@ -1,217 +1,479 @@
-const API_BASE = import.meta.env.VITE_API_BASE || '/api';
+/**
+ * GOSH Hidden Hearts - API Service Client
+ * Features:
+ * - Robust safeRequest wrapper preventing "Unexpected end of JSON input" and "Unexpected token '<'"
+ * - Automatic Content-Type and Authorization header management
+ * - Handles empty responses (204 No Content, Content-Length: 0) and non-JSON HTML (404/405 static errors)
+ * - Resolves production backend URL from VITE_API_URL / VITE_API_BASE
+ */
+
+// Resolves the backend API base URL with custom user override & environment variable support
+export const getApiBase = () => {
+  const customOverride = typeof localStorage !== 'undefined' ? localStorage.getItem('gosh_backend_url') : null;
+  const envUrl = customOverride || import.meta.env.VITE_API_BASE || import.meta.env.VITE_API_URL;
+  if (envUrl && envUrl.trim().length > 0) {
+    const clean = envUrl.trim().replace(/\/+$/, '');
+    return clean.endsWith('/api') ? clean : `${clean}/api`;
+  }
+  // In local browser dev, Vite proxies /api to port 5000
+  if (typeof window !== 'undefined') {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return '/api';
+    }
+  }
+  return '/api';
+};
+
+export const setCustomBackendUrl = (url) => {
+  if (typeof localStorage !== 'undefined') {
+    if (!url || url.trim() === '') {
+      localStorage.removeItem('gosh_backend_url');
+    } else {
+      let clean = url.trim().replace(/\/+$/, '');
+      if (clean.endsWith('/api')) clean = clean.slice(0, -4);
+      localStorage.setItem('gosh_backend_url', clean);
+    }
+  }
+};
+
+export const getCustomBackendUrl = () => {
+  return typeof localStorage !== 'undefined' ? localStorage.getItem('gosh_backend_url') || '' : '';
+};
+
+export const API_BASE = getApiBase();
+
+function getAuthHeaders(extra = {}) {
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('gosh_jwt_token') : null;
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...extra
+  };
+}
+
+/**
+ * Robust fetch wrapper:
+ * 1. Safely reads response as text first.
+ * 2. Never calls res.json() on empty responses (prevents "Unexpected end of JSON input").
+ * 3. Never calls res.json() on HTML/404 pages (prevents "Unexpected token '<'").
+ * 4. Catches network disconnections and offline errors gracefully without throwing unhandled exceptions.
+ */
+async function safeRequest(endpoint, options = {}, defaultData = {}) {
+  const currentBase = getApiBase();
+  const fullUrl = endpoint.startsWith('http')
+    ? endpoint
+    : `${currentBase}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+
+  try {
+    const res = await fetch(fullUrl, options);
+    const contentType = res.headers.get('content-type') || '';
+    const text = await res.text();
+
+    if (!text || text.trim().length === 0) {
+      return {
+        success: res.ok,
+        status: res.status,
+        empty: true,
+        message: res.status === 405 || res.status === 404
+          ? 'Backend endpoint not found on static host. Please connect your deployed backend server.'
+          : (res.ok ? 'Operation completed successfully' : `Server responded with status ${res.status}`),
+        ...defaultData
+      };
+    }
+
+    if (contentType.includes('application/json') || text.trim().startsWith('{') || text.trim().startsWith('[')) {
+      try {
+        const json = JSON.parse(text);
+        return {
+          ...defaultData,
+          ...json
+        };
+      } catch (parseErr) {
+        console.warn(`JSON parse error from ${fullUrl}:`, parseErr.message);
+        return {
+          success: false,
+          status: res.status,
+          error: 'Malformed JSON response',
+          message: 'Received invalid data format from server.',
+          ...defaultData
+        };
+      }
+    }
+
+    // Response is HTML (e.g. 404 from GitHub Pages) or other non-JSON text
+    return {
+      success: false,
+      status: res.status,
+      error: `Non-JSON response (${res.status})`,
+      message: res.status === 404
+        ? 'Backend API not reachable at this address. Please verify your backend server deployment.'
+        : `Server returned non-JSON response (${res.status})`,
+      isHtml: contentType.includes('text/html'),
+      ...defaultData
+    };
+  } catch (netErr) {
+    console.warn(`API Connection error for ${fullUrl}:`, netErr.message);
+    return {
+      success: false,
+      error: netErr.message || 'Network request failed',
+      message: 'Unable to connect to the backend server. Please verify your internet connection or backend server status.',
+      offline: true,
+      ...defaultData
+    };
+  }
+}
 
 export const api = {
   // Agree and Continue Terms Acceptance
   async recordTermsAcceptance(termsVersion = '1.0.0', privacyVersion = '1.0.0') {
-    const res = await fetch(`${API_BASE}/auth/terms-accept`, {
+    return safeRequest('/auth/terms-accept', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ termsVersion, privacyVersion, timestamp: new Date().toISOString() })
     });
-    return res.json();
   },
 
   // Identifier Resolution (Username / Mobile -> Email)
   async resolveIdentifier(identifier) {
-    const res = await fetch(`${API_BASE}/auth/resolve-identifier`, {
+    return safeRequest('/auth/resolve-identifier', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ identifier })
     });
-    return res.json();
   },
 
   // Check username & mobile uniqueness
   async checkAvailability(username, mobile) {
-    const res = await fetch(`${API_BASE}/auth/check-availability`, {
+    return safeRequest('/auth/check-availability', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, mobile })
     });
-    return res.json();
   },
 
   // Send Google SMTP OTP
-  async sendOTP(email, purpose = 'signup') {
-    const res = await fetch(`${API_BASE}/auth/send-otp`, {
+  async sendOTP(email, purpose = 'signup', identifier = null) {
+    return safeRequest('/auth/send-otp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, purpose })
+      body: JSON.stringify({ email, purpose, identifier })
     });
-    return res.json();
   },
 
   // Verify OTP
-  async verifyOTP(email, otp, purpose = 'signup') {
-    const res = await fetch(`${API_BASE}/auth/verify-otp`, {
+  async verifyOTP(email, otp, purpose = 'signup', identifier = null) {
+    return safeRequest('/auth/verify-otp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, otp, purpose })
+      body: JSON.stringify({ email, otp, purpose, identifier })
     });
-    return res.json();
+  },
+
+  // Login via Phone or Email + OTP
+  async loginWithOtp(identifier, otp) {
+    const data = await safeRequest('/auth/login-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier, otp })
+    });
+    if (data?.token && typeof localStorage !== 'undefined') {
+      localStorage.setItem('gosh_jwt_token', data.token);
+    }
+    return data;
+  },
+
+  // Password Reset with OTP
+  async resetPasswordWithOtp(identifier, otp, newPassword) {
+    return safeRequest('/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier, otp, newPassword })
+    });
   },
 
   // Sync / Initialize User in Backend
   async syncUser(userData) {
-    const res = await fetch(`${API_BASE}/auth/sync-user`, {
+    const data = await safeRequest('/auth/sync-user', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(userData)
     });
-    return res.json();
+    if (data?.token && typeof localStorage !== 'undefined') {
+      localStorage.setItem('gosh_jwt_token', data.token);
+    }
+    return data;
   },
 
   // Contact Discovery & Search
   async searchUsers(query) {
-    const res = await fetch(`${API_BASE}/users/search?q=${encodeURIComponent(query)}`);
-    return res.json();
+    return safeRequest(
+      `/users/search?q=${encodeURIComponent(query || '')}`,
+      { headers: getAuthHeaders() },
+      { users: [] }
+    );
+  },
+
+  // Contact Management
+  async getContacts(userId) {
+    return safeRequest(
+      `/users/contacts?userId=${userId || ''}`,
+      { headers: getAuthHeaders() },
+      { contacts: [] }
+    );
+  },
+
+  async addContact(contactUserId, nickname = null, userId = null) {
+    return safeRequest('/users/contacts', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ contactUserId, nickname, userId })
+    });
+  },
+
+  async updateContact(contactUserId, nickname, userId = null) {
+    return safeRequest(`/users/contacts/${contactUserId}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ nickname, userId })
+    });
+  },
+
+  async removeContact(contactUserId, userId = null) {
+    return safeRequest(`/users/contacts/${contactUserId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ userId })
+    });
+  },
+
+  // Blocked Users
+  async getBlockedUsers(userId) {
+    return safeRequest(
+      `/users/blocked?userId=${userId || ''}`,
+      { headers: getAuthHeaders() },
+      { blockedUsers: [] }
+    );
+  },
+
+  async blockUser(blockedUserId) {
+    return safeRequest('/users/block', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ blockedUserId })
+    });
+  },
+
+  async unblockUser(blockedUserId) {
+    return safeRequest('/users/unblock', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ blockedUserId })
+    });
   },
 
   // Profile Management
   async getProfile(userId) {
-    const res = await fetch(`${API_BASE}/users/profile/${userId}`);
-    return res.json();
+    return safeRequest(
+      `/users/profile/${userId}`,
+      { headers: getAuthHeaders() },
+      { profile: null }
+    );
   },
 
   async updateProfile(userId, profileData) {
-    const res = await fetch(`${API_BASE}/users/profile/${userId}`, {
+    return safeRequest(`/users/profile/${userId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(profileData)
     });
-    return res.json();
   },
 
   // Conversations & Messages
   async getConversations(userId) {
-    const res = await fetch(`${API_BASE}/conversations?userId=${userId}`);
-    return res.json();
+    return safeRequest(
+      `/conversations?userId=${userId || ''}`,
+      { headers: getAuthHeaders() },
+      { conversations: [] }
+    );
+  },
+
+  async createConversation(data) {
+    return safeRequest('/conversations', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data)
+    });
+  },
+
+  async createGroup(groupData) {
+    return safeRequest('/conversations/group', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(groupData)
+    });
   },
 
   async getMessages(conversationId) {
-    const res = await fetch(`${API_BASE}/messages/${conversationId}`);
-    return res.json();
+    return safeRequest(
+      `/messages/${conversationId}`,
+      { headers: getAuthHeaders() },
+      { messages: [] }
+    );
   },
 
   async sendMessage(data) {
-    const res = await fetch(`${API_BASE}/messages`, {
+    return safeRequest('/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     });
-    return res.json();
   },
 
   // Upload message attachment (images, audio, video, docs)
   async uploadAttachment(formData) {
-    const res = await fetch(`${API_BASE}/messages/upload`, {
+    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('gosh_jwt_token') : null;
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+    return safeRequest('/messages/upload', {
       method: 'POST',
+      headers,
       body: formData
     });
-    return res.json();
   },
 
   async deleteMessage(messageId, userId, deleteForEveryone = false) {
-    const res = await fetch(`${API_BASE}/messages/${messageId}`, {
+    return safeRequest(`/messages/${messageId}`, {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ userId, deleteForEveryone })
     });
-    return res.json();
   },
 
   async reactToMessage(messageId, userId, reaction) {
-    const res = await fetch(`${API_BASE}/messages/${messageId}/reaction`, {
+    return safeRequest(`/messages/${messageId}/reaction`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ userId, reaction })
     });
-    return res.json();
   },
 
   // Status / Stories
   async getStatuses(userId) {
-    const res = await fetch(`${API_BASE}/statuses?userId=${userId}`);
-    return res.json();
+    return safeRequest(
+      `/statuses?userId=${userId || ''}`,
+      { headers: getAuthHeaders() },
+      { statuses: [], myStatuses: [] }
+    );
   },
 
   async createStatus(formData) {
-    const res = await fetch(`${API_BASE}/statuses`, {
+    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('gosh_jwt_token') : null;
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+    return safeRequest('/statuses', {
       method: 'POST',
+      headers,
       body: formData
     });
-    return res.json();
   },
 
-  async markStatusViewed(statusId, viewerId) {
-    const res = await fetch(`${API_BASE}/statuses/${statusId}/view`, {
+  async markStatusViewed(statusId, viewerId, viewerName) {
+    return safeRequest(`/statuses/${statusId}/view`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ viewerId })
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ viewerId, viewerName })
     });
-    return res.json();
+  },
+
+  async deleteStatus(statusId) {
+    return safeRequest(`/statuses/${statusId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
   },
 
   // Calls
   async getCallHistory(userId) {
-    const res = await fetch(`${API_BASE}/calls/history?userId=${userId}`);
-    return res.json();
+    return safeRequest(
+      `/calls/history?userId=${userId || ''}`,
+      { headers: getAuthHeaders() },
+      { calls: [] }
+    );
   },
 
   async logCall(callData) {
-    const res = await fetch(`${API_BASE}/calls/log`, {
+    return safeRequest('/calls/log', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(callData)
     });
-    return res.json();
   },
 
   // Memory Vault (MEGA Cloud Storage)
   async getMemories(spaceId = 'default') {
-    const res = await fetch(`${API_BASE}/memory-vault?spaceId=${spaceId}`);
-    return res.json();
+    return safeRequest(
+      `/memory-vault?spaceId=${spaceId}`,
+      { headers: getAuthHeaders() },
+      { memories: [] }
+    );
   },
 
   async uploadMemory(formData) {
-    const res = await fetch(`${API_BASE}/memory-vault/upload`, {
+    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('gosh_jwt_token') : null;
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+    return safeRequest('/memory-vault/upload', {
       method: 'POST',
+      headers,
       body: formData
     });
-    return res.json();
   },
 
   async deleteMemory(memoryId, userId) {
-    const res = await fetch(`${API_BASE}/memory-vault/${memoryId}`, {
+    return safeRequest(`/memory-vault/${memoryId}`, {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ userId })
     });
-    return res.json();
   },
 
   // Settings & Passcode Vault
   async getSettings(userId) {
-    const res = await fetch(`${API_BASE}/settings/${userId}`);
-    return res.json();
+    return safeRequest(
+      `/settings/${userId || ''}`,
+      { headers: getAuthHeaders() },
+      { settings: null }
+    );
   },
 
   async updateSettings(userId, settings) {
-    const res = await fetch(`${API_BASE}/settings/${userId}`, {
+    return safeRequest(`/settings/${userId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(settings)
     });
-    return res.json();
   },
 
   async verifyPasscode(userId, passcode) {
-    const res = await fetch(`${API_BASE}/settings/${userId}/verify-passcode`, {
+    return safeRequest(`/settings/${userId}/verify-passcode`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ passcode })
     });
-    return res.json();
+  },
+
+  // E2EE Public Keys
+  async publishPublicKey(userId, publicKey) {
+    return safeRequest('/users/public-key', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ userId, publicKey })
+    });
+  },
+
+  async getPublicKey(userId) {
+    return safeRequest(
+      `/users/${userId}/public-key`,
+      { headers: getAuthHeaders() },
+      { publicKey: null }
+    );
   }
 };
 

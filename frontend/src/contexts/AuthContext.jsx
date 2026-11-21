@@ -5,72 +5,123 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signInWithPopup, 
-  signOut,
+  signInWithRedirect,
+  getRedirectResult,
+  signOut, 
   sendPasswordResetEmail,
   updateProfile,
   onAuthStateChanged 
 } from '../services/firebase';
 import api from '../services/api';
 import socketService from '../services/socket';
+import encryptionService from '../services/encryptionService';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null);
+  const [user, setUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('gosh_saved_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [profile, setProfile] = useState(() => {
+    try {
+      const saved = localStorage.getItem('gosh_saved_profile');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [loading, setLoading] = useState(true);
   const [termsAccepted, setTermsAccepted] = useState(() => {
     return localStorage.getItem('gosh_terms_accepted') === 'true';
   });
   const [isVaultLocked, setIsVaultLocked] = useState(true);
 
-  // Sync profile when auth state changes
+  // Sync profile when auth state changes & handle redirect results
   useEffect(() => {
+    // Process any redirect results from Google Sign-In
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          console.log('✅ Google redirect authentication successful for:', result.user.email);
+        }
+      })
+      .catch((err) => {
+        console.warn('Google redirect sign-in notice:', err.code, err.message);
+      });
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        let userObj = {
+          id: firebaseUser.uid,
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Soul Partner',
+          username: firebaseUser.displayName?.toLowerCase().replace(/\s+/g, '_') || firebaseUser.email?.split('@')[0] || 'soul_partner',
+          mobile: '',
+          avatarUrl: firebaseUser.photoURL || `https://api.dicebear.com/7.x/adventurer/svg?seed=${firebaseUser.uid}`,
+          bio: 'In a love story written by the stars ✨',
+          relationshipStatus: 'In a soul bond'
+        };
+
         try {
-          // Sync with backend / Supabase
+          // Sync with backend / Supabase if backend service is available
           const syncRes = await api.syncUser({
             firebaseUid: firebaseUser.uid,
             email: firebaseUser.email,
-            displayName: firebaseUser.displayName || firebaseUser.email.split('@')[0],
+            displayName: userObj.displayName,
             photoURL: firebaseUser.photoURL
           });
 
-          const userObj = {
-            id: syncRes.user?.id || firebaseUser.uid,
-            uid: firebaseUser.uid,
-            email: firebaseUser.email,
-            displayName: syncRes.profile?.display_name || firebaseUser.displayName || firebaseUser.email.split('@')[0],
-            username: syncRes.user?.username || firebaseUser.email.split('@')[0],
-            mobile: syncRes.user?.mobile_number || '',
-            avatarUrl: syncRes.profile?.avatar_url || firebaseUser.photoURL || `https://api.dicebear.com/7.x/adventurer/svg?seed=${firebaseUser.uid}`,
-            bio: syncRes.profile?.bio || 'In a love story written by the stars ✨',
-            relationshipStatus: syncRes.profile?.relationship_status || 'In a soul bond'
-          };
-
-          setUser(userObj);
-          setProfile(syncRes.profile || userObj);
-
-          // Connect to real-time socket
-          socketService.connect(userObj);
+          if (syncRes && syncRes.user) {
+            userObj = {
+              ...userObj,
+              id: syncRes.user.id || userObj.id,
+              username: syncRes.user.username || userObj.username,
+              mobile: syncRes.user.mobile_number || '',
+              displayName: syncRes.profile?.display_name || userObj.displayName,
+              avatarUrl: syncRes.profile?.avatar_url || userObj.avatarUrl,
+              bio: syncRes.profile?.bio || userObj.bio,
+              relationshipStatus: syncRes.profile?.relationship_status || userObj.relationshipStatus
+            };
+          }
         } catch (err) {
-          console.error('Error syncing user profile:', err);
-          const fallbackUser = {
-            id: firebaseUser.uid,
-            uid: firebaseUser.uid,
-            email: firebaseUser.email,
-            displayName: firebaseUser.displayName || firebaseUser.email.split('@')[0],
-            avatarUrl: firebaseUser.photoURL || `https://api.dicebear.com/7.x/adventurer/svg?seed=${firebaseUser.uid}`
-          };
-          setUser(fallbackUser);
-          setProfile(fallbackUser);
-          socketService.connect(fallbackUser);
+          console.warn('Backend sync skipped or offline, continuing with Firebase session:', err);
         }
+
+        setUser(userObj);
+        setProfile(userObj);
+        localStorage.setItem('gosh_saved_user', JSON.stringify(userObj));
+        localStorage.setItem('gosh_saved_profile', JSON.stringify(userObj));
+
+        // Connect to real-time socket
+        socketService.connect(userObj);
+
+        // Initialize E2EE Keypair
+        encryptionService.initUserKeys(userObj.id).catch(console.warn);
       } else {
-        setUser(null);
-        setProfile(null);
-        socketService.disconnect();
+        // If no Firebase session, check if we have an OTP-authenticated user session
+        const token = localStorage.getItem('gosh_jwt_token');
+        const savedUser = localStorage.getItem('gosh_saved_user');
+        if (token && savedUser) {
+          try {
+            const parsed = JSON.parse(savedUser);
+            setUser(parsed);
+            socketService.connect(parsed);
+            encryptionService.initUserKeys(parsed.id).catch(console.warn);
+          } catch {
+            setUser(null);
+            setProfile(null);
+          }
+        } else {
+          setUser(null);
+          setProfile(null);
+          socketService.disconnect();
+        }
       }
       setLoading(false);
     });
@@ -106,10 +157,60 @@ export const AuthProvider = ({ children }) => {
     return credential.user;
   };
 
-  // Google OAuth Login
+  // Login via Phone Number / Email + OTP
+  const loginWithOtp = async (identifier, otp) => {
+    const res = await api.loginWithOtp(identifier, otp);
+    if (!res.success) {
+      throw new Error(res.message || 'OTP Login failed. Please verify code.');
+    }
+
+    const userObj = {
+      id: res.user.id,
+      uid: res.user.firebase_uid || res.user.id,
+      email: res.user.email,
+      displayName: res.profile?.display_name || res.user.username,
+      username: res.user.username,
+      mobile: res.user.mobile_number,
+      avatarUrl: res.profile?.avatar_url || `https://api.dicebear.com/7.x/adventurer/svg?seed=${res.user.id}`,
+      bio: res.profile?.bio || 'In a love story written by the stars ✨',
+      relationshipStatus: res.profile?.relationship_status || 'In a soul bond'
+    };
+
+    setUser(userObj);
+    setProfile(res.profile || userObj);
+    localStorage.setItem('gosh_saved_user', JSON.stringify(userObj));
+    localStorage.setItem('gosh_saved_profile', JSON.stringify(res.profile || userObj));
+    socketService.connect(userObj);
+
+    return userObj;
+  };
+
+  // Google OAuth Login with popup and fallback to redirect
   const loginWithGoogle = async () => {
-    const res = await signInWithPopup(auth, googleProvider);
-    return res.user;
+    try {
+      const res = await signInWithPopup(auth, googleProvider);
+      return res.user;
+    } catch (popupErr) {
+      console.warn('Google Popup Sign-in notice:', popupErr.code, popupErr.message);
+
+      // If popup was blocked by browser or mobile webview, automatically fall back to redirect
+      if (
+        popupErr.code === 'auth/popup-blocked' ||
+        popupErr.code === 'auth/cancelled-popup-request' ||
+        popupErr.code === 'auth/operation-not-supported-in-this-environment'
+      ) {
+        console.log('Popup blocked; falling back to Google Sign-in with redirect...');
+        await signInWithRedirect(auth, googleProvider);
+        return null;
+      }
+
+      throw popupErr;
+    }
+  };
+
+  // Explicit Google OAuth Redirect (Ideal for mobile Safari / Chrome)
+  const loginWithGoogleRedirect = async () => {
+    await signInWithRedirect(auth, googleProvider);
   };
 
   // Signup flow
@@ -138,7 +239,14 @@ export const AuthProvider = ({ children }) => {
 
   // Logout
   const logout = async () => {
-    await signOut(auth);
+    try {
+      await signOut(auth);
+    } catch (e) {
+      // Firebase might not be signed in if logged in via direct OTP
+    }
+    localStorage.removeItem('gosh_jwt_token');
+    localStorage.removeItem('gosh_saved_user');
+    localStorage.removeItem('gosh_saved_profile');
     socketService.disconnect();
     setUser(null);
     setProfile(null);
@@ -183,8 +291,10 @@ export const AuthProvider = ({ children }) => {
       termsAccepted,
       acceptTerms,
       login,
+      loginWithOtp,
       signup,
       loginWithGoogle,
+      loginWithGoogleRedirect,
       logout,
       resetPassword,
       refreshProfile,

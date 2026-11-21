@@ -2,6 +2,13 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import socketService from '../services/socket';
 import api from '../services/api';
 import { useAuth } from './AuthContext';
+import {
+  playIncomingRingtone,
+  playOutgoingDialTone,
+  playCallConnectedChime,
+  playCallEndedChime,
+  stopAllCallSounds
+} from '../utils/callSounds';
 
 const CallContext = createContext(null);
 
@@ -19,10 +26,11 @@ export const CallProvider = ({ children }) => {
   const [incomingCall, setIncomingCall] = useState(null);
   const [callType, setCallType] = useState('audio'); // 'audio' or 'video'
   const [callPartner, setCallPartner] = useState(null);
-  const [callStatus, setCallStatus] = useState('idle'); // 'idle', 'calling', 'ringing', 'connected', 'ended'
+  const [callStatus, setCallStatus] = useState('idle'); // 'idle', 'calling', 'ringing', 'connected', 'ended', 'rejected'
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [facingMode, setFacingMode] = useState('user'); // 'user' or 'environment'
   const [callDuration, setCallDuration] = useState(0);
 
   const localStreamRef = useRef(null);
@@ -30,10 +38,34 @@ export const CallProvider = ({ children }) => {
   const peerConnectionRef = useRef(null);
   const durationTimerRef = useRef(null);
   const screenTrackRef = useRef(null);
+  const titleIntervalRef = useRef(null);
+  const originalTitleRef = useRef(document.title);
 
   // Video element references for rendering
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
+
+  // Restore document title helper
+  const restoreDocumentTitle = () => {
+    if (titleIntervalRef.current) {
+      clearInterval(titleIntervalRef.current);
+      titleIntervalRef.current = null;
+    }
+    document.title = originalTitleRef.current || 'GOSH • Hidden Hearts';
+  };
+
+  // Flash document title on incoming call
+  const startTitleNotification = (callerName) => {
+    restoreDocumentTitle();
+    originalTitleRef.current = document.title;
+    let toggle = false;
+    titleIntervalRef.current = setInterval(() => {
+      toggle = !toggle;
+      document.title = toggle
+        ? `📞 Incoming Call from ${callerName}!`
+        : '❤️ GOSH Hidden Hearts';
+    }, 1000);
+  };
 
   // Setup socket listeners for WebRTC signaling
   useEffect(() => {
@@ -49,11 +81,29 @@ export const CallProvider = ({ children }) => {
       });
       setCallType(data.callType || 'audio');
       setCallStatus('ringing');
+
+      // Play synthesized romantic ringtone
+      playIncomingRingtone();
+      startTitleNotification(data.callerName);
+
+      // Desktop push notification if enabled
+      if ('Notification' in window && Notification.permission === 'granted') {
+        try {
+          new Notification(`Incoming ${data.callType === 'video' ? 'Video' : 'Voice'} Call`, {
+            body: `${data.callerName} is calling you on GOSH Hidden Hearts...`,
+            icon: data.callerAvatar || '/favicon.ico'
+          });
+        } catch (e) {}
+      }
     };
 
     const handleCallAccepted = async (data) => {
       console.log('✅ Call accepted by remote party');
+      stopAllCallSounds();
+      playCallConnectedChime();
+      restoreDocumentTitle();
       setCallStatus('connected');
+
       if (peerConnectionRef.current && data.signal) {
         try {
           await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.signal));
@@ -66,12 +116,20 @@ export const CallProvider = ({ children }) => {
 
     const handleCallRejected = (data) => {
       console.log('❌ Call rejected by remote party');
+      stopAllCallSounds();
+      playCallEndedChime();
+      restoreDocumentTitle();
       setCallStatus('rejected');
-      cleanupCall();
+      setTimeout(() => {
+        cleanupCall();
+      }, 1200);
     };
 
     const handleCallEnded = () => {
       console.log('⏹️ Call ended by remote party');
+      stopAllCallSounds();
+      playCallEndedChime();
+      restoreDocumentTitle();
       cleanupCall();
     };
 
@@ -97,6 +155,8 @@ export const CallProvider = ({ children }) => {
       socketService.off('call_rejected', handleCallRejected);
       socketService.off('call_ended', handleCallEnded);
       socketService.off('ice_candidate', handleIceCandidate);
+      stopAllCallSounds();
+      restoreDocumentTitle();
     };
   }, [user]);
 
@@ -142,10 +202,13 @@ export const CallProvider = ({ children }) => {
       setCallStatus('calling');
       setCallActive(true);
 
+      // Play synthesized outgoing dialing tone
+      playOutgoingDialTone();
+
       // 1. Get media
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
-        video: type === 'video'
+        video: type === 'video' ? { facingMode: 'user' } : false
       });
       localStreamRef.current = stream;
       if (localVideoRef.current) {
@@ -171,6 +234,7 @@ export const CallProvider = ({ children }) => {
       });
     } catch (err) {
       console.error('Failed to initiate call:', err);
+      stopAllCallSounds();
       alert('Could not access microphone/camera: ' + err.message);
       cleanupCall();
     }
@@ -181,6 +245,10 @@ export const CallProvider = ({ children }) => {
     if (!incomingCall) return;
 
     try {
+      stopAllCallSounds();
+      playCallConnectedChime();
+      restoreDocumentTitle();
+
       const type = incomingCall.callType || 'audio';
       setCallType(type);
       setCallStatus('connected');
@@ -188,7 +256,7 @@ export const CallProvider = ({ children }) => {
 
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
-        video: type === 'video'
+        video: type === 'video' ? { facingMode: 'user' } : false
       });
       localStreamRef.current = stream;
       if (localVideoRef.current) {
@@ -220,8 +288,24 @@ export const CallProvider = ({ children }) => {
 
   // Reject incoming call
   const rejectCall = () => {
+    stopAllCallSounds();
+    playCallEndedChime();
+    restoreDocumentTitle();
+
     if (incomingCall) {
       socketService.emit('reject_call', { callerId: incomingCall.callerId });
+
+      // Log missed call
+      if (user) {
+        api.logCall({
+          callerId: incomingCall.callerId,
+          receiverId: user.id,
+          callType: incomingCall.callType || 'audio',
+          callStatus: 'missed',
+          durationSeconds: 0
+        }).catch(console.warn);
+      }
+
       setIncomingCall(null);
     }
     cleanupCall();
@@ -229,6 +313,10 @@ export const CallProvider = ({ children }) => {
 
   // End active call
   const endCall = () => {
+    stopAllCallSounds();
+    playCallEndedChime();
+    restoreDocumentTitle();
+
     const targetId = callPartner?.id || incomingCall?.callerId;
     if (targetId) {
       socketService.emit('end_call', { targetUserId: targetId });
@@ -241,13 +329,16 @@ export const CallProvider = ({ children }) => {
         callType,
         callStatus: callStatus === 'connected' ? 'ended' : 'missed',
         durationSeconds: callDuration
-      }).catch(console.error);
+      }).catch(console.warn);
     }
     cleanupCall();
   };
 
   // Cleanup helper
   const cleanupCall = () => {
+    stopAllCallSounds();
+    restoreDocumentTitle();
+
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => track.stop());
       localStreamRef.current = null;
@@ -288,6 +379,40 @@ export const CallProvider = ({ children }) => {
         videoTrack.enabled = !videoTrack.enabled;
         setIsVideoEnabled(videoTrack.enabled);
       }
+    }
+  };
+
+  // Flip / Switch Camera (Front vs Back camera on mobile/tablet)
+  const toggleCameraFacingMode = async () => {
+    if (!peerConnectionRef.current || callType !== 'video') return;
+
+    try {
+      const nextMode = facingMode === 'user' ? 'environment' : 'user';
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { exact: nextMode } },
+        audio: false
+      });
+      const newVideoTrack = newStream.getVideoTracks()[0];
+
+      const sender = peerConnectionRef.current.getSenders().find(s => s.track && s.track.kind === 'video');
+      if (sender && newVideoTrack) {
+        sender.replaceTrack(newVideoTrack);
+      }
+
+      if (localStreamRef.current) {
+        const oldTrack = localStreamRef.current.getVideoTracks()[0];
+        if (oldTrack) oldTrack.stop();
+        localStreamRef.current.removeTrack(oldTrack);
+        localStreamRef.current.addTrack(newVideoTrack);
+      }
+
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = localStreamRef.current;
+      }
+
+      setFacingMode(nextMode);
+    } catch (err) {
+      console.warn('Could not switch camera facing mode:', err);
     }
   };
 
@@ -341,6 +466,7 @@ export const CallProvider = ({ children }) => {
       isMuted,
       isVideoEnabled,
       isScreenSharing,
+      facingMode,
       callDuration,
       localVideoRef,
       remoteVideoRef,
@@ -350,6 +476,7 @@ export const CallProvider = ({ children }) => {
       endCall,
       toggleMute,
       toggleVideo,
+      toggleCameraFacingMode,
       toggleScreenSharing
     }}>
       {children}

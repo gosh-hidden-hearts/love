@@ -1,20 +1,47 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Lock, User, Heart, Sparkles, AlertCircle, CheckCircle2, ArrowRight } from 'lucide-react';
+import { 
+  Eye, 
+  EyeOff, 
+  Lock, 
+  User, 
+  Phone,
+  Mail,
+  Heart, 
+  Sparkles, 
+  AlertCircle, 
+  CheckCircle2, 
+  ArrowRight,
+  ShieldCheck,
+  Key
+} from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
+import InstallPWA from '../components/InstallPWA';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login, loginWithGoogle } = useAuth();
+  const { login, loginWithOtp, loginWithGoogle, loginWithGoogleRedirect } = useAuth();
 
+  // Login Mode Tab
+  const [loginMode, setLoginMode] = useState('password'); // 'password' | 'otp'
+
+  // Password Login state
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
-  
+
+  // Phone / Email OTP Login state
+  const [otpIdentifier, setOtpIdentifier] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpMsg, setOtpMsg] = useState({ text: '', type: '' });
+  const [resendTimer, setResendTimer] = useState(0);
+
   // Forgot Password modal state
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [forgotIdentifier, setForgotIdentifier] = useState('');
@@ -25,7 +52,8 @@ export default function LoginPage() {
   const [forgotMsg, setForgotMsg] = useState({ text: '', type: '' });
   const [resolvedForgotEmail, setResolvedForgotEmail] = useState('');
 
-  const handleSubmit = async (e) => {
+  // Handle standard password login
+  const handlePasswordSubmit = async (e) => {
     e.preventDefault();
     if (!identifier.trim() || !password) {
       setError('Please provide your login ID and password.');
@@ -36,7 +64,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(identifier, password);
-      navigate('/');
+      navigate('/chats');
     } catch (err) {
       console.error('Login error:', err);
       let msg = 'Failed to sign in. Please check your credentials.';
@@ -53,15 +81,92 @@ export default function LoginPage() {
     }
   };
 
-  const handleGoogleLogin = async () => {
+  // Handle Send Login OTP
+  const handleSendLoginOtp = async (e) => {
+    e.preventDefault();
+    if (!otpIdentifier.trim()) {
+      setOtpMsg({ text: 'Please enter your registered mobile number or email.', type: 'error' });
+      return;
+    }
+
+    setOtpLoading(true);
+    setOtpMsg({ text: '', type: '' });
+    try {
+      const res = await api.sendOTP(null, 'login', otpIdentifier.trim());
+      if (res.success) {
+        setOtpSent(true);
+        setOtpMsg({ 
+          text: `A 6-digit login OTP was sent to ${res.email ? res.email.replace(/(.{2})(.*)(?=@)/, '$1***') : 'your registered contact'}.`, 
+          type: 'success' 
+        });
+        startResendTimer();
+      } else {
+        throw new Error(res.message || 'Failed to dispatch login OTP.');
+      }
+    } catch (err) {
+      setOtpMsg({ text: err.message || 'Could not send login OTP.', type: 'error' });
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  // Handle Verify Login OTP
+  const handleVerifyLoginOtp = async (e) => {
+    e.preventDefault();
+    if (!otpCode.trim() || otpCode.trim().length !== 6) {
+      setOtpMsg({ text: 'Please enter the complete 6-digit OTP code.', type: 'error' });
+      return;
+    }
+
+    setOtpLoading(true);
+    setOtpMsg({ text: '', type: '' });
+    try {
+      await loginWithOtp(otpIdentifier.trim(), otpCode.trim());
+      navigate('/chats');
+    } catch (err) {
+      setOtpMsg({ text: err.message || 'OTP verification failed.', type: 'error' });
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const startResendTimer = () => {
+    setResendTimer(60);
+    const interval = setInterval(() => {
+      setResendTimer((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  // Google OAuth Login
+  const handleGoogleLogin = async (useRedirect = false) => {
     setError('');
     setGoogleLoading(true);
     try {
-      await loginWithGoogle();
-      navigate('/');
+      if (useRedirect) {
+        await loginWithGoogleRedirect();
+        return;
+      }
+      const user = await loginWithGoogle();
+      if (user) {
+        navigate('/chats');
+      }
     } catch (err) {
-      console.error('Google login error:', err);
-      setError('Google Sign In was canceled or failed: ' + err.message);
+      console.warn('Google login notice:', err.code, err.message);
+      if (err.code === 'auth/popup-closed-by-user') {
+        setError('Sign-in window was closed. If popups are blocked or not working on your device, use the redirect option below.');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setError("Domain not authorized in Firebase Console! Please add 'gosh-hidden-hearts.github.io' under Firebase Console > Authentication > Settings > Authorized domains.");
+      } else if (err.code === 'auth/popup-blocked') {
+        setError('Popup was blocked by your browser. Please allow popups or use the redirect button below.');
+      } else {
+        setError(err.message || 'Google Sign In was canceled or failed.');
+      }
     } finally {
       setGoogleLoading(false);
     }
@@ -84,7 +189,6 @@ export default function LoginPage() {
       }
       setResolvedForgotEmail(email);
 
-      // Send OTP via Google SMTP
       const otpRes = await api.sendOTP(email, 'forgot_password');
       if (otpRes.success) {
         setForgotStep(2);
@@ -127,13 +231,16 @@ export default function LoginPage() {
     }
     setForgotLoading(true);
     try {
-      // In Firebase client, password reset can be completed via standard link or backend admin update
-      await api.updateProfile(null, { email: resolvedForgotEmail, newPassword });
-      setForgotMsg({ text: 'Password reset successful! You can now log in.', type: 'success' });
-      setTimeout(() => {
-        setShowForgotModal(false);
-        setForgotStep(1);
-      }, 2000);
+      const res = await api.resetPasswordWithOtp(resolvedForgotEmail, forgotOtp.trim(), newPassword);
+      if (res.success) {
+        setForgotMsg({ text: 'Password reset successful! You can now log in.', type: 'success' });
+        setTimeout(() => {
+          setShowForgotModal(false);
+          setForgotStep(1);
+        }, 2000);
+      } else {
+        throw new Error(res.message || 'Password update failed.');
+      }
     } catch (err) {
       setForgotMsg({ text: 'Could not reset password: ' + err.message, type: 'error' });
     } finally {
@@ -142,7 +249,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#0c0d14] flex flex-col justify-center items-center px-4 py-8 relative overflow-hidden text-slate-100 select-none">
+    <div className="min-h-screen w-full bg-[#08090e] flex flex-col justify-center items-center px-4 py-8 relative overflow-hidden text-slate-100 select-none">
       {/* Background glowing spheres */}
       <div className="absolute top-10 left-1/4 w-80 h-80 bg-rose-600/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-10 right-1/4 w-96 h-96 bg-purple-900/15 rounded-full blur-3xl pointer-events-none" />
@@ -150,111 +257,259 @@ export default function LoginPage() {
       {/* Main Card */}
       <div className="w-full max-w-md glass-panel p-8 rounded-3xl shadow-2xl border border-white/10 relative z-10">
         {/* Brand header */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-6">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-rose-500/20 to-purple-600/30 border border-rose-500/30 shadow-glow-pink mb-3">
-            <Heart className="w-7 h-7 text-rose-500 fill-rose-500" />
+            <Heart className="w-7 h-7 text-rose-500 fill-rose-500 animate-pulse-slow" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white flex items-center justify-center gap-1.5">
             GOSH <Sparkles className="w-4 h-4 text-rose-400" />
           </h1>
-          <p className="text-xs text-rose-300 font-medium tracking-wider uppercase mt-0.5">Glimpse Of Soul Hearts</p>
-          <p className="text-xs text-slate-400 mt-2">Sign in to your private romantic sanctuary</p>
+          <p className="text-xs text-rose-300 font-semibold tracking-widest uppercase mt-0.5 font-mono">Hidden Hearts</p>
+          <p className="text-xs text-slate-400 mt-2">Sign in to your private romantic communication sanctuary</p>
+        </div>
+
+        {/* Login Method Switcher Tabs */}
+        <div className="grid grid-cols-2 gap-2 p-1 bg-black/40 rounded-xl mb-6 border border-white/5">
+          <button
+            type="button"
+            onClick={() => {
+              setLoginMode('password');
+              setError('');
+            }}
+            className={`py-2 rounded-lg text-xs font-semibold transition ${
+              loginMode === 'password'
+                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30 shadow-glow-pink'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Password Sign In
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setLoginMode('otp');
+              setError('');
+              setOtpMsg({ text: '', type: '' });
+            }}
+            className={`py-2 rounded-lg text-xs font-semibold transition ${
+              loginMode === 'otp'
+                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30 shadow-glow-pink'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            Phone / Email OTP
+          </button>
         </div>
 
         {/* Error Alert */}
         {error && (
-          <div className="mb-5 p-3.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2.5">
+          <div className="mb-5 p-3.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2.5 animate-fadeIn">
             <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400" />
             <span>{error}</span>
           </div>
         )}
 
-        {/* Login Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Identifier input (supports Mobile, Username, Email) */}
-          <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">
-              Login ID <span className="text-slate-500 font-normal">(Email, Username, or Mobile)</span>
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                <User className="w-4 h-4" />
-              </div>
-              <input
-                type="text"
-                value={identifier}
-                onChange={(e) => setIdentifier(e.target.value)}
-                placeholder="you@domain.com or @username or +91..."
-                className="w-full pl-10 pr-4 py-3 rounded-xl glass-input text-sm text-white placeholder-slate-500 focus:outline-none transition"
-                required
-              />
-            </div>
-          </div>
-
-          {/* Password input */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-xs font-medium text-slate-300">
-                Password
+        {/* =========================================================================
+            TAB 1: PASSWORD LOGIN (Username, Email, or Mobile + Password)
+           ========================================================================= */}
+        {loginMode === 'password' && (
+          <form onSubmit={handlePasswordSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                Login ID <span className="text-slate-500 font-normal">(Email, @username, or Mobile)</span>
               </label>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowForgotModal(true);
-                  setForgotStep(1);
-                  setForgotMsg({ text: '', type: '' });
-                }}
-                className="text-xs text-rose-400 hover:text-rose-300 transition"
-              >
-                Forgot Password?
-              </button>
-            </div>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                <Lock className="w-4 h-4" />
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                  <User className="w-4 h-4" />
+                </div>
+                <input
+                  type="text"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  placeholder="you@domain.com or @username or +91..."
+                  className="w-full pl-10 pr-4 py-3 rounded-xl glass-input text-sm text-white placeholder-slate-500 focus:outline-none transition"
+                  required
+                />
               </div>
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••••••"
-                className="w-full pl-10 pr-11 py-3 rounded-xl glass-input text-sm text-white placeholder-slate-500 focus:outline-none transition"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-white transition"
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
             </div>
-          </div>
 
-          {/* Login Button */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3.5 rounded-xl btn-romantic-primary font-semibold text-sm flex items-center justify-center gap-2 transition disabled:opacity-60 mt-2"
-          >
-            {loading ? (
-              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              <>
-                <span>Sign In to GOSH</span>
-                <ArrowRight className="w-4 h-4" />
-              </>
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-medium text-slate-300">
+                  Password
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForgotModal(true);
+                    setForgotStep(1);
+                    setForgotMsg({ text: '', type: '' });
+                  }}
+                  className="text-xs text-rose-400 hover:text-rose-300 transition"
+                >
+                  Forgot Password?
+                </button>
+              </div>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••••••"
+                  className="w-full pl-10 pr-11 py-3 rounded-xl glass-input text-sm text-white placeholder-slate-500 focus:outline-none transition"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-white transition"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3.5 rounded-xl btn-romantic-primary font-semibold text-sm flex items-center justify-center gap-2 transition disabled:opacity-60 mt-2"
+            >
+              {loading ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <>
+                  <span>Sign In to GOSH</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          </form>
+        )}
+
+        {/* =========================================================================
+            TAB 2: PHONE / EMAIL OTP LOGIN (WhatsApp style)
+           ========================================================================= */}
+        {loginMode === 'otp' && (
+          <div className="space-y-4">
+            {otpMsg.text && (
+              <div className={`p-3 rounded-xl text-xs flex items-center gap-2 animate-fadeIn ${
+                otpMsg.type === 'success' 
+                  ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-300' 
+                  : 'bg-rose-500/15 border border-rose-500/30 text-rose-300'
+              }`}>
+                {otpMsg.type === 'success' ? <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> : <AlertCircle className="w-4 h-4 flex-shrink-0" />}
+                <span>{otpMsg.text}</span>
+              </div>
             )}
-          </button>
-        </form>
+
+            {!otpSent ? (
+              <form onSubmit={handleSendLoginOtp} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                    Phone Number or Email
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <Phone className="w-4 h-4" />
+                    </div>
+                    <input
+                      type="text"
+                      value={otpIdentifier}
+                      onChange={(e) => setOtpIdentifier(e.target.value)}
+                      placeholder="+91... or email@domain.com"
+                      className="w-full pl-10 pr-4 py-3 rounded-xl glass-input text-sm text-white placeholder-slate-500 focus:outline-none transition"
+                      required
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">We will send a 6-digit OTP code to verify your account.</p>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={otpLoading}
+                  className="w-full py-3.5 rounded-xl btn-romantic-primary font-semibold text-sm flex items-center justify-center gap-2 transition disabled:opacity-60"
+                >
+                  {otpLoading ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <span>Send 6-Digit Login Code</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleVerifyLoginOtp} className="space-y-4">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-medium text-slate-300">
+                      Verification Code
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOtpSent(false);
+                        setOtpCode('');
+                      }}
+                      className="text-xs text-rose-400 hover:underline"
+                    >
+                      Change ID
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
+                    placeholder="••••••"
+                    className="w-full text-center tracking-[0.5em] text-xl font-mono px-4 py-3 rounded-xl glass-input text-white placeholder-slate-500 focus:outline-none"
+                    autoFocus
+                    required
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={otpLoading}
+                  className="w-full py-3.5 rounded-xl btn-romantic-green font-semibold text-sm flex items-center justify-center gap-2 transition disabled:opacity-60"
+                >
+                  {otpLoading ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <span>Verify & Enter GOSH</span>
+                      <ShieldCheck className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+
+                {/* Resend OTP */}
+                <div className="text-center pt-2">
+                  <button
+                    type="button"
+                    disabled={resendTimer > 0 || otpLoading}
+                    onClick={handleSendLoginOtp}
+                    className="text-xs text-slate-400 hover:text-rose-300 disabled:opacity-50 transition"
+                  >
+                    {resendTimer > 0 ? `Resend OTP in ${resendTimer}s` : 'Resend OTP Code'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        )}
 
         {/* Divider */}
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-white/10" />
           </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-[#151724] px-3 text-slate-500">or connect with</span>
+          <div className="relative flex justify-center text-xs uppercase font-mono">
+            <span className="bg-[#0f111a] px-3 text-slate-500">or connect with</span>
           </div>
         </div>
 
@@ -292,6 +547,15 @@ export default function LoginPage() {
           )}
         </button>
 
+        <button
+          type="button"
+          onClick={() => handleGoogleLogin(true)}
+          disabled={googleLoading}
+          className="w-full mt-2 text-[11px] text-slate-400 hover:text-rose-300 transition text-center underline"
+        >
+          Popup blocked or closed? Sign in with Google Redirect
+        </button>
+
         {/* Signup Link */}
         <p className="mt-6 text-center text-xs text-slate-400">
           Don&apos;t have an account?{' '}
@@ -316,7 +580,7 @@ export default function LoginPage() {
 
             {forgotMsg.text && (
               <div className={`p-3 mb-4 rounded-xl text-xs flex items-center gap-2 ${forgotMsg.type === 'success' ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-300' : 'bg-rose-500/15 border border-rose-500/30 text-rose-300'}`}>
-                {forgotMsg.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                {forgotMsg.type === 'success' ? <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> : <AlertCircle className="w-4 h-4 flex-shrink-0" />}
                 <span>{forgotMsg.text}</span>
               </div>
             )}
@@ -356,9 +620,9 @@ export default function LoginPage() {
                   type="text"
                   maxLength={6}
                   value={forgotOtp}
-                  onChange={(e) => setForgotOtp(e.target.value)}
-                  placeholder="6-digit OTP"
-                  className="w-full text-center tracking-widest text-lg font-mono px-4 py-3 rounded-xl glass-input text-white placeholder-slate-500 focus:outline-none"
+                  onChange={(e) => setForgotOtp(e.target.value.replace(/[^0-9]/g, ''))}
+                  placeholder="••••••"
+                  className="w-full text-center tracking-[0.5em] text-xl font-mono px-4 py-3 rounded-xl glass-input text-white placeholder-slate-500 focus:outline-none"
                   required
                 />
                 <div className="flex gap-3 justify-end pt-2">
@@ -404,6 +668,8 @@ export default function LoginPage() {
           </div>
         </div>
       )}
+      {/* Progressive Web App Android Install Experience */}
+      <InstallPWA />
     </div>
   );
 }

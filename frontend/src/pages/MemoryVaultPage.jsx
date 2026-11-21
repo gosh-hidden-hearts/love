@@ -30,10 +30,13 @@ export default function MemoryVaultPage() {
 
   // State
   const [memories, setMemories] = useState([]);
+  const [albums, setAlbums] = useState(ALBUM_PRESETS);
   const [selectedAlbum, setSelectedAlbum] = useState('All Memories');
   const [activeTabFilter, setActiveTabFilter] = useState('all'); // 'all' | 'photo' | 'video' | 'audio' | 'document'
   const [searchQuery, setSearchQuery] = useState('');
   const [activeLightboxMemory, setActiveLightboxMemory] = useState(null);
+  const [showAddAlbumModal, setShowAddAlbumModal] = useState(false);
+  const [newAlbumName, setNewAlbumName] = useState('');
 
   // Upload Modal State
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -52,9 +55,15 @@ export default function MemoryVaultPage() {
 
   const loadMemories = async () => {
     try {
-      const res = await api.getMemories('default-couple-space');
+      const res = await api.getMemories(user?.id);
       if (res.memories && res.memories.length > 0) {
         setMemories(res.memories);
+        // Collect custom albums from memories
+        const loadedAlbums = new Set(ALBUM_PRESETS);
+        res.memories.forEach(m => {
+          if (m.album) loadedAlbums.add(m.album);
+        });
+        setAlbums(Array.from(loadedAlbums));
       } else {
         // Romantic demo vault items
         setMemories([
@@ -170,6 +179,18 @@ export default function MemoryVaultPage() {
     }
   };
 
+  const handleCreateAlbum = (e) => {
+    e.preventDefault();
+    if (!newAlbumName.trim()) return;
+    const trimmed = newAlbumName.trim();
+    if (!albums.includes(trimmed)) {
+      setAlbums((prev) => [...prev, trimmed]);
+    }
+    setSelectedAlbum(trimmed);
+    setNewAlbumName('');
+    setShowAddAlbumModal(false);
+  };
+
   const handleDeleteMemory = async (memId) => {
     if (!confirm('Are you sure you want to remove this memory from your shared vault?')) return;
     setMemories((prev) => prev.filter((m) => m.id !== memId));
@@ -216,7 +237,7 @@ export default function MemoryVaultPage() {
       <div className="max-w-6xl mx-auto w-full space-y-6">
         {/* Album Selector Chips */}
         <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-          {ALBUM_PRESETS.map((album) => (
+          {albums.map((album) => (
             <button
               key={album}
               onClick={() => setSelectedAlbum(album)}
@@ -230,6 +251,13 @@ export default function MemoryVaultPage() {
               <span>{album}</span>
             </button>
           ))}
+          <button
+            onClick={() => setShowAddAlbumModal(true)}
+            className="px-3.5 py-2 rounded-xl text-xs font-medium whitespace-nowrap bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 flex items-center gap-1.5 transition"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>New Album</span>
+          </button>
         </div>
 
         {/* Media Type Filter & Search Bar */}
@@ -467,7 +495,7 @@ export default function MemoryVaultPage() {
                   onChange={(e) => setTargetAlbum(e.target.value)}
                   className="w-full py-2 px-3 rounded-xl glass-input text-xs text-white focus:outline-none bg-[#151724]"
                 >
-                  {ALBUM_PRESETS.map((album) => (
+                  {albums.map((album) => (
                     <option key={album} value={album} className="bg-slate-900 text-white">
                       {album}
                     </option>
@@ -486,6 +514,42 @@ export default function MemoryVaultPage() {
                 className="w-full py-3 rounded-xl btn-romantic-primary font-semibold text-xs tracking-wider uppercase flex items-center justify-center gap-2 transition disabled:opacity-50"
               >
                 {uploading ? 'Streaming to MEGA...' : 'Save to Shared Vault'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* New Custom Album Modal */}
+      {showAddAlbumModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
+          <div className="glass-panel w-full max-w-sm p-6 rounded-3xl border border-rose-500/30 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-semibold text-white flex items-center gap-2">
+                <FolderHeart className="w-4 h-4 text-rose-400" /> Create Custom Album
+              </h3>
+              <button onClick={() => setShowAddAlbumModal(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleCreateAlbum} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Album Title</label>
+                <input
+                  type="text"
+                  value={newAlbumName}
+                  onChange={(e) => setNewAlbumName(e.target.value)}
+                  placeholder="e.g. Paris 2026, Our Cozy Nights..."
+                  className="w-full py-2.5 px-4 rounded-xl glass-input text-xs text-white placeholder-slate-500 focus:outline-none"
+                  autoFocus
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                className="w-full py-2.5 rounded-xl btn-romantic-primary font-semibold text-xs tracking-wider uppercase flex items-center justify-center gap-2 transition"
+              >
+                Create Album
               </button>
             </form>
           </div>

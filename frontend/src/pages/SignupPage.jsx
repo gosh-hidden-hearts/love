@@ -7,7 +7,7 @@ import api from '../services/api';
 
 export default function SignupPage() {
   const navigate = useNavigate();
-  const { signup, loginWithGoogle } = useAuth();
+  const { signup, loginWithGoogle, loginWithGoogleRedirect } = useAuth();
 
   // Form states
   const [email, setEmail] = useState('');
@@ -171,16 +171,30 @@ export default function SignupPage() {
     }
   };
 
-  const handleGoogleSignup = async () => {
+  const handleGoogleSignup = async (useRedirect = false) => {
     setError('');
     setGoogleLoading(true);
     try {
-      await loginWithGoogle();
-      confetti({ particleCount: 70, spread: 60, colors: ['#f43f5e', '#c084fc'] });
-      navigate('/');
+      if (useRedirect) {
+        await loginWithGoogleRedirect();
+        return;
+      }
+      const user = await loginWithGoogle();
+      if (user) {
+        confetti({ particleCount: 70, spread: 60, colors: ['#f43f5e', '#c084fc'] });
+        navigate('/');
+      }
     } catch (err) {
-      console.error('Google signup error:', err);
-      setError('Google Sign In was canceled or failed: ' + err.message);
+      console.warn('Google signup notice:', err.code, err.message);
+      if (err.code === 'auth/popup-closed-by-user') {
+        setError('Sign-in popup was closed before completing. If you are on mobile or popups are blocked, use the redirect option below.');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setError("Domain not authorized in Firebase Console! Please add 'gosh-hidden-hearts.github.io' under Firebase Console > Authentication > Settings > Authorized domains.");
+      } else if (err.code === 'auth/popup-blocked') {
+        setError('Popup was blocked by your browser. Please allow popups or use the redirect button below.');
+      } else {
+        setError(err.message || 'Google Sign In was canceled or failed.');
+      }
     } finally {
       setGoogleLoading(false);
     }
@@ -502,6 +516,15 @@ export default function SignupPage() {
                   <span>Quick Sign Up with Google</span>
                 </>
               )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleGoogleSignup(true)}
+              disabled={googleLoading}
+              className="w-full mt-2 text-[11px] text-slate-400 hover:text-rose-300 transition text-center underline"
+            >
+              Popup blocked or closed? Sign up with Google Redirect
             </button>
           </>
         )}

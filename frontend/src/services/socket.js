@@ -13,8 +13,18 @@ class SocketService {
     }
 
     this.currentUser = user;
-    // In production or development with Vite proxy, connect to VITE_SOCKET_URL, localhost:5000, or origin
-    const serverUrl = import.meta.env.VITE_SOCKET_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5000' : window.location.origin);
+
+    // Check if on a static hosting environment like GitHub Pages without an explicit backend
+    const isGitHubPages = typeof window !== 'undefined' && window.location.hostname.endsWith('github.io');
+    const customOverride = typeof localStorage !== 'undefined' ? localStorage.getItem('gosh_backend_url') : null;
+    const customSocketUrl = customOverride || import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_API_URL;
+
+    if (isGitHubPages && !customSocketUrl) {
+      console.info('ℹ️ Running on GitHub Pages without VITE_SOCKET_URL. Socket connections paused until live backend is connected.');
+      return null;
+    }
+
+    const serverUrl = customSocketUrl || (typeof window !== 'undefined' && window.location.hostname === 'localhost' ? 'http://localhost:5000' : window.location.origin);
 
     this.socket = io(serverUrl, {
       transports: ['websocket', 'polling'],
