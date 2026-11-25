@@ -63,6 +63,7 @@ export default function AccountsPage() {
   const [avatarUrl, setAvatarUrl] = useState('');
 
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [copiedId, setCopiedId] = useState(false);
 
@@ -86,15 +87,18 @@ export default function AccountsPage() {
     setSaving(true);
     setSuccessMsg('');
     try {
-      await api.updateProfile(user.id, {
+      const res = await api.updateProfile('me', {
         displayName,
         username,
         mobile,
         bio,
         relationshipStatus,
         anniversaryDate,
-        avatarUrl
+        avatarUrl: avatarUrl?.startsWith('blob:') ? user?.avatarUrl : avatarUrl
       });
+      if (!res?.success) {
+        throw new Error(res?.message || 'Failed to save profile changes.');
+      }
       await refreshProfile();
       setSuccessMsg('Profile updated and synchronized successfully!');
       setTimeout(() => setSuccessMsg(''), 3000);
@@ -106,11 +110,28 @@ export default function AccountsPage() {
     }
   };
 
-  const handleAvatarUpload = (e) => {
+  const handleAvatarUpload = async (e) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setAvatarUrl(url);
+    if (!file) return;
+    setUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const uploadRes = await api.uploadAttachment(formData);
+      if (uploadRes?.success && uploadRes.fileUrl) {
+        setAvatarUrl(uploadRes.previewUrl || uploadRes.fileUrl);
+        await api.updateProfile('me', { avatarUrl: uploadRes.fileUrl });
+        await refreshProfile();
+        setSuccessMsg('Profile photo updated!');
+        setTimeout(() => setSuccessMsg(''), 2500);
+      } else {
+        throw new Error(uploadRes?.message || 'Could not upload avatar image.');
+      }
+    } catch (err) {
+      console.warn('Avatar upload error:', err);
+      alert('Failed to upload profile photo: ' + err.message);
+    } finally {
+      setUploadingAvatar(false);
     }
   };
 
@@ -154,8 +175,8 @@ export default function AccountsPage() {
                 />
                 <label className="absolute inset-0 bg-black/60 rounded-full flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer">
                   <Camera className="w-5 h-5 text-white mb-1" />
-                  <span className="text-[10px] text-white font-medium">Change</span>
-                  <input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
+                  <span className="text-[10px] text-white font-medium">{uploadingAvatar ? 'Uploading...' : 'Change'}</span>
+                  <input type="file" accept="image/*" onChange={handleAvatarUpload} disabled={uploadingAvatar} className="hidden" />
                 </label>
               </div>
 

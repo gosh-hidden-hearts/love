@@ -191,21 +191,29 @@ function createInMemorySupabase() {
         return { data: null, error: null };
       }
 
-      // SELECT with basic joins used by repository
+      // Enforce PostgREST PGRST201 ambiguity if implicit multi-FK embeds are attempted!
+      if (state.selectCols.includes('user_profiles')) {
+        return {
+          data: null,
+          error: {
+            code: 'PGRST201',
+            message: "Could not embed because more than one relationship was found for 'users' and 'user_profiles'"
+          }
+        };
+      }
+      if (tableName === 'user_profiles' && state.selectCols.includes('users') && !state.selectCols.includes('!')) {
+        return {
+          data: null,
+          error: {
+            code: 'PGRST201',
+            message: "Could not embed because more than one relationship was found for 'users' and 'user_profiles'"
+          }
+        };
+      }
+
+      // SELECT with flat joins used by repository
       let matched = rows.filter(match).map((r) => ({ ...r }));
 
-      if (tableName === 'users' && state.selectCols.includes('user_profiles')) {
-        matched = matched.map((u) => ({
-          ...u,
-          user_profiles: tables.user_profiles.find((p) => p.user_id === u.id) || null
-        }));
-      }
-      if (tableName === 'user_profiles' && state.selectCols.includes('users')) {
-        matched = matched.map((p) => ({
-          ...p,
-          users: tables.users.find((u) => u.id === p.user_id) || null
-        }));
-      }
       if (tableName === 'contacts' && state.selectCols.includes('contact_user')) {
         matched = matched.map((c) => {
           const u = tables.users.find((x) => x.id === c.contact_user_id);

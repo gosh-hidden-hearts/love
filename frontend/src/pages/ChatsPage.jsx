@@ -91,14 +91,23 @@ export default function ChatsPage() {
   // Refs
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const activeConversationRef = useRef(activeConversation);
 
-  // Initial load
   useEffect(() => {
-    if (!user) return;
+    activeConversationRef.current = activeConversation;
+  }, [activeConversation]);
+
+  // Initial load (runs once per authenticated user)
+  useEffect(() => {
+    if (!user?.id) return;
     loadConversations();
     loadContacts();
+  }, [user?.id]);
 
-    // Socket real-time listeners
+  // Socket real-time listeners
+  useEffect(() => {
+    if (!user?.id) return;
+
     const handleReceiveMessage = async (msg) => {
       console.log('💬 New real-time message received:', msg);
 
@@ -108,7 +117,8 @@ export default function ChatsPage() {
         processedMsg = { ...msg, content: decryptedText, isE2EE: true };
       }
 
-      if (activeConversation && (msg.conversationId === activeConversation.id || msg.senderId === activeConversation.partnerId)) {
+      const activeConv = activeConversationRef.current;
+      if (activeConv && (msg.conversationId === activeConv.id || msg.senderId === activeConv.partnerId)) {
         setMessages((prev) =>
           prev.some((m) => m.id === processedMsg.id) ? prev : [...prev, processedMsg]
         );
@@ -128,7 +138,7 @@ export default function ChatsPage() {
                 ...c,
                 lastMessageText: processedMsg.content || 'Media message',
                 lastMessageAt: msg.createdAt,
-                unreadCount: c.id === activeConversation?.id ? 0 : (c.unreadCount || 0) + 1
+                unreadCount: c.id === activeConv?.id ? 0 : (c.unreadCount || 0) + 1
               }
             : c
         );
@@ -136,15 +146,30 @@ export default function ChatsPage() {
     };
 
     const handlePartnerTyping = (data) => {
-      if (activeConversation && data.userId === activeConversation.partnerId) {
+      const activeConv = activeConversationRef.current;
+      if (activeConv && data.userId === activeConv.partnerId) {
         setPartnerTyping(true);
       }
     };
 
     const handlePartnerStopTyping = (data) => {
-      if (activeConversation && data.userId === activeConversation.partnerId) {
+      const activeConv = activeConversationRef.current;
+      if (activeConv && data.userId === activeConv.partnerId) {
         setPartnerTyping(false);
       }
+    };
+
+    const handlePresenceUpdate = ({ userId: targetUid, online, lastSeen }) => {
+      if (!targetUid) return;
+      setConversations((prev) =>
+        prev.map((c) => (c.partnerId === targetUid ? { ...c, online, lastSeen } : c))
+      );
+      setContacts((prev) =>
+        prev.map((c) => (c.userId === targetUid ? { ...c, onlineStatus: online, lastSeen } : c))
+      );
+      setActiveConversation((prev) =>
+        prev && prev.partnerId === targetUid ? { ...prev, online, lastSeen } : prev
+      );
     };
 
     const handleMessageBlocked = (data) => {
@@ -155,15 +180,17 @@ export default function ChatsPage() {
     socketService.on('receive_message', handleReceiveMessage);
     socketService.on('user_typing', handlePartnerTyping);
     socketService.on('user_stop_typing', handlePartnerStopTyping);
+    socketService.on('presence_update', handlePresenceUpdate);
     socketService.on('message_blocked', handleMessageBlocked);
 
     return () => {
       socketService.off('receive_message', handleReceiveMessage);
       socketService.off('user_typing', handlePartnerTyping);
       socketService.off('user_stop_typing', handlePartnerStopTyping);
+      socketService.off('presence_update', handlePresenceUpdate);
       socketService.off('message_blocked', handleMessageBlocked);
     };
-  }, [user, activeConversation]);
+  }, [user?.id]);
 
   // Load Contacts from Backend & Supabase
   const loadContacts = async () => {
@@ -296,7 +323,7 @@ export default function ChatsPage() {
         ? window.crypto.randomUUID()
         : 'msg-' + Date.now();
 
-    const newMsg = {
+    const optimisticMsg = {
       id: clientMsgId,
       conversationId: activeConversation?.id,
       senderId: user?.id,
@@ -305,8 +332,10 @@ export default function ChatsPage() {
       replyToText: replyingTo?.content || null,
       messageType: customPayload?.messageType || 'text',
       content: textToSend,
-      mediaUrl: customPayload?.fileUrl || null,
-      audioUrl: customPayload?.audioUrl || null,
+      mediaUrl: customPayload?.previewUrl || customPayload?.fileUrl || null,
+      audioUrl: customPayload?.messageType === 'audio'
+        ? (customPayload?.previewUrl || customPayload?.audioUrl || null)
+        : (customPayload?.audioUrl || null),
       duration: customPayload?.duration || null,
       fileName: customPayload?.fileName || null,
       fileSize: customPayload?.fileSize || null,
@@ -317,7 +346,7 @@ export default function ChatsPage() {
     };
 
     // Optimistic UI update
-    setMessages((prev) => [...prev, { ...newMsg, isE2EE: !activeConversation?.isGroup }]);
+    setMessages((prev) => [...prev, { ...optimisticMsg, isE2EE: !activeConversation?.isGroup }]);
     setInputText('');
     setReplyingTo(null);
     setShowEmojiPicker(false);
@@ -334,39 +363,64 @@ export default function ChatsPage() {
     }
 
     const wirePayload = {
-      ...newMsg,
+      id: clientMsgId,
+      conversationId: activeConversation?.id,
+      senderId: user?.id,
+      senderName: user?.displayName,
+      replyToId: optimisticMsg.replyToId,
+      replyToText: optimisticMsg.replyToText,
+      messageType: optimisticMsg.messageType,
       content: payloadContent,
+      mediaUrl: customPayload?.fileUrl || null,
+      audioUrl: customPayload?.audioUrl || null,
+      duration: optimisticMsg.duration,
+      fileName: optimisticMsg.fileName,
+      fileSize: optimisticMsg.fileSize,
+      megaFileHandle: optimisticMsg.megaFileHandle,
+      megaDownloadUrl: optimisticMsg.megaDownloadUrl,
       targetUserId: activeConversation?.partnerId
     };
 
-    // Persist to Supabase via backend API first
+    // Persist via Edge API first
     try {
       const res = await api.sendMessage(wirePayload);
       if (!res?.success) {
         setMessages((prev) => prev.filter((m) => m.id !== clientMsgId));
-        setContactErrorNotice(res?.message || 'Could not save message to Supabase.');
+        setContactErrorNotice(res?.message || 'Could not send message. Please try again.');
         setTimeout(() => setContactErrorNotice(''), 6000);
         return;
+      }
+
+      if (res.message) {
+        const persisted = {
+          ...optimisticMsg,
+          ...res.message,
+          content: textToSend,
+          mediaUrl: res.message.mediaUrl || optimisticMsg.mediaUrl,
+          audioUrl: res.message.audioUrl || optimisticMsg.audioUrl,
+          isE2EE: !activeConversation?.isGroup
+        };
+        setMessages((prev) => prev.map((m) => (m.id === clientMsgId ? persisted : m)));
       }
 
       // Emit over WebSocket after DB persistence succeeds
       socketService.emit('send_message', {
         ...wirePayload,
         id: res.message?.id || clientMsgId,
-        createdAt: res.message?.createdAt || newMsg.createdAt
+        createdAt: res.message?.createdAt || optimisticMsg.createdAt
       });
 
       setConversations((prev) =>
         prev.map((c) =>
           c.id === activeConversation?.id
-            ? { ...c, lastMessageText: textToSend || 'Media message', lastMessageAt: newMsg.createdAt }
+            ? { ...c, lastMessageText: textToSend || 'Media message', lastMessageAt: res.message?.createdAt || optimisticMsg.createdAt }
             : c
         )
       );
     } catch (err) {
-      console.error('Failed to save message to database:', err);
+      console.error('Failed to save message:', err);
       setMessages((prev) => prev.filter((m) => m.id !== clientMsgId));
-      setContactErrorNotice(err.message || 'Failed to save message to database.');
+      setContactErrorNotice(err.message || 'Could not send message. Please try again.');
       setTimeout(() => setContactErrorNotice(''), 6000);
     }
   };
@@ -549,12 +603,16 @@ export default function ChatsPage() {
           const formData = new FormData();
           formData.append('file', audioBlob, `voice_${Date.now()}.webm`);
           const uploadRes = await api.uploadAttachment(formData);
-          const audioUrl = uploadRes.fileUrl || URL.createObjectURL(audioBlob);
+          if (!uploadRes?.success || !uploadRes.fileUrl) {
+            throw new Error(uploadRes?.message || 'Voice upload failed.');
+          }
+          const previewUrl = uploadRes.previewUrl || URL.createObjectURL(audioBlob);
 
           handleSendMessage({
             messageType: 'audio',
             content: 'Voice Message 🎙️',
-            audioUrl,
+            audioUrl: uploadRes.fileUrl,
+            previewUrl,
             duration: voiceRecordTime,
             megaFileHandle: uploadRes.megaFileHandle || null,
             megaDownloadUrl: uploadRes.megaDownloadUrl || null
@@ -616,8 +674,12 @@ export default function ChatsPage() {
       const formData = new FormData();
       formData.append('file', file);
       const uploadRes = await api.uploadAttachment(formData);
+      if (!uploadRes?.success || !uploadRes.fileUrl) {
+        throw new Error(uploadRes?.message || 'Attachment upload failed.');
+      }
 
-      const fileUrl = uploadRes.fileUrl || URL.createObjectURL(file);
+      const fileUrl = uploadRes.fileUrl;
+      const previewUrl = uploadRes.previewUrl || URL.createObjectURL(file);
       let messageType = 'file';
       if (file.type.startsWith('image/')) messageType = 'image';
       else if (file.type.startsWith('video/')) messageType = 'video';
@@ -627,6 +689,7 @@ export default function ChatsPage() {
         messageType,
         content: file.name,
         fileUrl,
+        previewUrl,
         fileName: file.name,
         fileSize: file.size,
         megaFileHandle: uploadRes.megaFileHandle || null,

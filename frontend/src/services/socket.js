@@ -37,6 +37,7 @@ class SupabaseRealtimeService {
         method: 'POST',
         headers: {
           apikey: supabasePublishableKey,
+          Authorization: `Bearer ${supabasePublishableKey}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({

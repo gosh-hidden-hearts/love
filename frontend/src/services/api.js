@@ -52,6 +52,9 @@ export const resolveFileUrl = (url) => {
   if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
     return url;
   }
+  if (url.startsWith('storage://')) {
+    return '';
+  }
   const apiBase = getApiBase();
   if (!apiBase || apiBase === '/api') {
     return url;

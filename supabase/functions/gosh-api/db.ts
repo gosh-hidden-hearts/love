@@ -148,41 +148,102 @@ export async function broadcastToUsers(
   }
 }
 
+export async function resolveProfileMedia(
+  supabase: SupabaseClient,
+  profile: Record<string, unknown> | null
+): Promise<Record<string, unknown> | null> {
+  if (!profile) return null;
+  const rawAvatar = typeof profile.avatar_url === 'string' ? profile.avatar_url : null;
+  if (rawAvatar && rawAvatar.startsWith(STORAGE_PREFIX)) {
+    const signed = await resolveMediaUrl(supabase, rawAvatar);
+    return { ...profile, avatar_url: signed || rawAvatar };
+  }
+  return profile;
+}
+
+export async function attachProfileToUser(
+  supabase: SupabaseClient,
+  userRow: Record<string, unknown> | null
+) {
+  if (!userRow?.id) return null;
+  const { data: prof, error } = await supabase
+    .from('user_profiles')
+    .select('*')
+    .eq('user_id', userRow.id)
+    .maybeSingle();
+  assertNoError(error, 'attachProfileToUser failed');
+  return {
+    ...userRow,
+    user_profiles: await resolveProfileMedia(supabase, prof)
+  };
+}
+
+export async function fetchUsersMapWithProfiles(
+  supabase: SupabaseClient,
+  userIds: unknown[]
+): Promise<Map<string, Record<string, unknown>>> {
+  const ids = Array.from(new Set(userIds.filter(isUuid)));
+  const map = new Map<string, Record<string, unknown>>();
+  if (ids.length === 0) return map;
+
+  const [{ data: usersData, error: uErr }, { data: profilesData, error: pErr }] = await Promise.all([
+    supabase.from('users').select('id, username, status').in('id', ids),
+    supabase.from('user_profiles').select('*').in('user_id', ids)
+  ]);
+  assertNoError(uErr, 'fetchUsersMapWithProfiles(users) failed');
+  assertNoError(pErr, 'fetchUsersMapWithProfiles(user_profiles) failed');
+
+  const profileMap = new Map<string, Record<string, unknown>>();
+  await Promise.all(
+    (profilesData || []).map(async (p) => {
+      const resolved = await resolveProfileMedia(supabase, p);
+      if (resolved && typeof p.user_id === 'string') {
+        profileMap.set(p.user_id, resolved);
+      }
+    })
+  );
+
+  for (const u of usersData || []) {
+    map.set(u.id, {
+      ...u,
+      user_profiles: profileMap.get(u.id) || null
+    });
+  }
+  return map;
+}
+
 export const db = {
   async findUserById(supabase: SupabaseClient, userId: string) {
     if (!isUuid(userId)) return null;
     const { data, error } = await supabase
       .from('users')
-      .select('*, user_profiles(*)')
+      .select('*')
       .eq('id', userId)
       .maybeSingle();
     assertNoError(error, 'findUserById failed');
-    if (!data) return null;
-    return { ...data, user_profiles: normalizeProfileJoin(data.user_profiles) };
+    return attachProfileToUser(supabase, data);
   },
 
   async findUserByFirebaseUid(supabase: SupabaseClient, firebaseUid: string) {
     if (!firebaseUid) return null;
     const { data, error } = await supabase
       .from('users')
-      .select('*, user_profiles(*)')
+      .select('*')
       .eq('firebase_uid', firebaseUid)
       .maybeSingle();
     assertNoError(error, 'findUserByFirebaseUid failed');
-    if (!data) return null;
-    return { ...data, user_profiles: normalizeProfileJoin(data.user_profiles) };
+    return attachProfileToUser(supabase, data);
   },
 
   async findUserByEmail(supabase: SupabaseClient, email: string) {
     if (!email) return null;
     const { data, error } = await supabase
       .from('users')
-      .select('*, user_profiles(*)')
+      .select('*')
       .eq('email', email.trim().toLowerCase())
       .maybeSingle();
     assertNoError(error, 'findUserByEmail failed');
-    if (!data) return null;
-    return { ...data, user_profiles: normalizeProfileJoin(data.user_profiles) };
+    return attachProfileToUser(supabase, data);
   },
 
   async findUserByIdentifier(supabase: SupabaseClient, identifier: string) {
@@ -212,22 +273,22 @@ export const db = {
 
     const { data: byUsername, error: userErr } = await supabase
       .from('users')
-      .select('*, user_profiles(*)')
+      .select('*')
       .eq('username', normalized)
       .maybeSingle();
     assertNoError(userErr, 'findUserByIdentifier(username) failed');
     if (byUsername) {
-      return { ...byUsername, user_profiles: normalizeProfileJoin(byUsername.user_profiles) };
+      return attachProfileToUser(supabase, byUsername);
     }
 
     const { data: byMobile, error: mobErr } = await supabase
       .from('users')
-      .select('*, user_profiles(*)')
+      .select('*')
       .eq('mobile_number', rawTrimmed)
       .maybeSingle();
     assertNoError(mobErr, 'findUserByIdentifier(mobile) failed');
     if (byMobile) {
-      return { ...byMobile, user_profiles: normalizeProfileJoin(byMobile.user_profiles) };
+      return attachProfileToUser(supabase, byMobile);
     }
 
     return null;
@@ -475,10 +536,11 @@ export const db = {
     assertNoError(setErr, 'syncFirebaseUser(upsert settings) failed');
 
     await this.syncUserIdentifiers(supabase, userRow);
+    const resolvedProfile = await resolveProfileMedia(supabase, profileRow);
 
     return {
-      user: { ...userRow, user_profiles: profileRow },
-      profile: profileRow
+      user: { ...userRow, user_profiles: resolvedProfile },
+      profile: resolvedProfile
     };
   },
 
@@ -533,61 +595,49 @@ export const db = {
     if (isUuid(raw)) {
       const found = await this.findUserById(supabase, raw);
       if (!found || found.id === excludeUserId) return [];
+      const prof = found.user_profiles as Record<string, unknown> | null;
       return [{
         id: found.id,
         username: found.username,
-        displayName: found.user_profiles?.display_name || found.username,
-        avatarUrl: found.user_profiles?.avatar_url || null,
-        bio: found.user_profiles?.bio || 'In a love story written by the stars ✨',
-        onlineStatus: Boolean(found.user_profiles?.online_status)
+        displayName: (prof?.display_name as string) || found.username,
+        avatarUrl: (prof?.avatar_url as string) || null,
+        bio: (prof?.bio as string) || 'In a love story written by the stars ✨',
+        onlineStatus: Boolean(prof?.online_status)
       }];
     }
 
     const pattern = `%${escapeIlike(raw.toLowerCase())}%`;
 
-    const { data: byUsername, error: err1 } = await supabase
-      .from('users')
-      .select('id, username, user_profiles(display_name, avatar_url, bio, online_status)')
-      .ilike('username', pattern)
-      .limit(20);
+    const [{ data: byUsername, error: err1 }, { data: byDisplayName, error: err2 }] = await Promise.all([
+      supabase.from('users').select('id').ilike('username', pattern).limit(20),
+      supabase.from('user_profiles').select('user_id').ilike('display_name', pattern).limit(20)
+    ]);
     assertNoError(err1, 'searchUsers(username) failed');
-
-    const { data: byDisplayName, error: err2 } = await supabase
-      .from('user_profiles')
-      .select('user_id, display_name, avatar_url, bio, online_status, users!user_profiles_user_id_fkey(id, username)')
-      .ilike('display_name', pattern)
-      .limit(20);
     assertNoError(err2, 'searchUsers(display_name) failed');
 
-    const map = new Map<string, Record<string, unknown>>();
-    for (const u of byUsername || []) {
-      if (u.id === excludeUserId) continue;
-      const prof = normalizeProfileJoin(u.user_profiles);
-      map.set(u.id, {
-        id: u.id,
-        username: u.username,
-        displayName: prof?.display_name || u.username,
-        avatarUrl: prof?.avatar_url || null,
-        bio: prof?.bio || 'In a love story written by the stars ✨',
-        onlineStatus: Boolean(prof?.online_status)
-      });
-    }
+    const candidateIds = Array.from(
+      new Set([
+        ...(byUsername || []).map((u) => u.id),
+        ...(byDisplayName || []).map((p) => p.user_id)
+      ])
+    ).filter((id) => Boolean(id) && id !== excludeUserId).slice(0, 20);
 
-    for (const p of byDisplayName || []) {
-      const uid = p.user_id;
-      if (!uid || uid === excludeUserId || map.has(uid)) continue;
-      const usr = Array.isArray(p.users) ? p.users[0] : p.users;
-      map.set(uid, {
-        id: uid,
-        username: usr?.username || 'user',
-        displayName: p.display_name || usr?.username || 'Soul Member',
-        avatarUrl: p.avatar_url || null,
-        bio: p.bio || 'In a love story written by the stars ✨',
-        onlineStatus: Boolean(p.online_status)
-      });
-    }
-
-    return Array.from(map.values()).slice(0, 20);
+    const userMap = await fetchUsersMapWithProfiles(supabase, candidateIds);
+    return candidateIds
+      .map((id) => {
+        const u = userMap.get(id);
+        if (!u) return null;
+        const prof = u.user_profiles as Record<string, unknown> | null;
+        return {
+          id: u.id,
+          username: u.username,
+          displayName: (prof?.display_name as string) || (u.username as string) || 'Soul Member',
+          avatarUrl: (prof?.avatar_url as string) || null,
+          bio: (prof?.bio as string) || 'In a love story written by the stars ✨',
+          onlineStatus: Boolean(prof?.online_status)
+        };
+      })
+      .filter(Boolean);
   },
 
   // OTP
@@ -676,9 +726,12 @@ export const db = {
     const convIds = memberships.map((m) => m.conversation_id);
     const { data: allMembers, error: mErr } = await supabase
       .from('conversation_members')
-      .select('conversation_id, user_id, users(id, username, user_profiles(display_name, avatar_url, online_status, last_seen))')
+      .select('conversation_id, user_id')
       .in('conversation_id', convIds);
     assertNoError(mErr, 'getConversationsForUser(members) failed');
+
+    const participantIds = (allMembers || []).map((row) => row.user_id);
+    const usersMap = await fetchUsersMapWithProfiles(supabase, participantIds);
 
     const { data: userContacts, error: cErr } = await supabase
       .from('contacts')
@@ -687,7 +740,7 @@ export const db = {
     assertNoError(cErr, 'getConversationsForUser(contacts) failed');
 
     const nicknameMap = new Map((userContacts || []).map((c) => [c.contact_user_id, c.nickname]));
-    const membersByConv = new Map<string, Array<Record<string, unknown>>>();
+    const membersByConv = new Map<string, Array<{ conversation_id: string; user_id: string }>>();
     for (const row of allMembers || []) {
       if (!membersByConv.has(row.conversation_id)) membersByConv.set(row.conversation_id, []);
       membersByConv.get(row.conversation_id)!.push(row);
@@ -700,10 +753,8 @@ export const db = {
       const partnerEntry = !isGroup
         ? participants.find((p) => p.user_id !== userId) || participants[0]
         : null;
-      const partnerUser = partnerEntry?.users
-        ? (Array.isArray(partnerEntry.users) ? partnerEntry.users[0] : partnerEntry.users)
-        : null;
-      const partnerProfile = normalizeProfileJoin(partnerUser?.user_profiles);
+      const partnerUser = partnerEntry?.user_id ? usersMap.get(partnerEntry.user_id) || null : null;
+      const partnerProfile = (partnerUser?.user_profiles as Record<string, unknown> | null) || null;
 
       const partnerId = (partnerUser?.id || partnerEntry?.user_id || null) as string | null;
       const partnerNickname = partnerId ? nicknameMap.get(partnerId) : null;

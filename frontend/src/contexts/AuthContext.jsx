@@ -327,8 +327,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const refreshProfile = async () => {
-    if (user?.id && UUID_REGEX.test(user.id)) {
-      const res = await api.getProfile(user.id);
+    if (auth?.currentUser || (user?.id && UUID_REGEX.test(user.id))) {
+      const res = await api.getProfile('me');
       if (res?.success && res.profile) {
         const updatedUser = buildUserObject(auth?.currentUser, res.user, res.profile);
         persistSessionState(updatedUser, res.profile);

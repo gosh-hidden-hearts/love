@@ -62,7 +62,7 @@ export default function SettingsPage() {
   // Load persisted settings on mount
   useEffect(() => {
     if (user?.id) {
-      api.getSettings(user.id).then((res) => {
+      api.getSettings('me').then((res) => {
         if (res.settings) {
           const s = res.settings;
           if (s.theme) setTheme(s.theme);
@@ -89,7 +89,7 @@ export default function SettingsPage() {
 
     if (user?.id) {
       try {
-        await api.updateSettings(user.id, { passcode: tempPin });
+        await api.updateSettings('me', { passcode: tempPin });
       } catch (e) {
         console.warn('Could not persist PIN to server:', e);
       }
@@ -106,7 +106,7 @@ export default function SettingsPage() {
 
     if (user?.id) {
       try {
-        const res = await api.verifyPasscode(user.id, verifyPinInput);
+        const res = await api.verifyPasscode('me', verifyPinInput);
         if (res.valid) isValid = true;
       } catch (e) {}
     }
@@ -156,7 +156,7 @@ export default function SettingsPage() {
     setSavingSettings(true);
     try {
       if (user?.id) {
-        await api.updateSettings(user.id, {
+        const res = await api.updateSettings('me', {
           theme,
           soundEnabled,
           notificationsEnabled,
@@ -167,11 +167,15 @@ export default function SettingsPage() {
           statusPrivacy,
           readReceipts
         });
+        if (!res?.success) {
+          throw new Error(res?.message || 'Failed to save preferences.');
+        }
       }
       setSaveSettingsSuccess(true);
       setTimeout(() => setSaveSettingsSuccess(false), 2500);
     } catch (err) {
       console.error('Failed to save settings:', err);
+      alert('Failed to save settings: ' + err.message);
     } finally {
       setSavingSettings(false);
     }

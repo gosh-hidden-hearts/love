@@ -2,6 +2,7 @@ import { verifyFirebaseIdToken } from './firebaseAuth.ts';
 import {
   createAdminClient,
   db,
+  fetchUsersMapWithProfiles,
   isUuid,
   resolveMediaUrl,
   sha256Hex,
@@ -269,8 +270,10 @@ Deno.serve(async (req: Request) => {
     // =========================================================================
     // ALL ROUTES BELOW REQUIRE AUTHENTICATED FIREBASE TOKEN + SYNCED USER
     // =========================================================================
-    const { dbUser } = await authenticateRequest(req, supabase);
+    const { fbUser, dbUser } = await authenticateRequest(req, supabase);
     const currentUserId = dbUser.id as string;
+    const resolveSelfId = (idOrAlias: string) =>
+      idOrAlias === 'me' || idOrAlias === fbUser.uid ? currentUserId : idOrAlias;
 
     // Search Users
     if (method === 'GET' && route === '/users/search') {
@@ -282,7 +285,7 @@ Deno.serve(async (req: Request) => {
     // Profile Get & Update
     const profileMatch = route.match(/^\/users\/profile\/([^/]+)$/);
     if (profileMatch) {
-      const targetId = profileMatch[1] === 'me' ? currentUserId : profileMatch[1];
+      const targetId = resolveSelfId(profileMatch[1]);
       if (method === 'GET') {
         const user = await db.findUserById(supabase, targetId);
         if (!user) return jsonResponse({ success: false, message: 'User not found.' }, 404);
@@ -325,23 +328,28 @@ Deno.serve(async (req: Request) => {
     if (route === '/users/contacts' && method === 'GET') {
       const { data, error } = await supabase
         .from('contacts')
-        .select('*, contact_user:contact_user_id(id, username, user_profiles(*))')
+        .select('*')
         .eq('user_id', currentUserId)
         .order('created_at', { ascending: false });
       if (error) throw error;
 
+      const userMap = await fetchUsersMapWithProfiles(
+        supabase,
+        (data || []).map((c) => c.contact_user_id)
+      );
+
       const contacts = (data || []).map((c) => {
-        const cu = Array.isArray(c.contact_user) ? c.contact_user[0] : c.contact_user;
-        const prof = Array.isArray(cu?.user_profiles) ? cu?.user_profiles[0] : cu?.user_profiles;
+        const cu = userMap.get(c.contact_user_id);
+        const prof = cu?.user_profiles as Record<string, unknown> | null;
         return {
           contactId: c.id,
-          userId: cu?.id || c.contact_user_id,
-          username: cu?.username,
-          displayName: prof?.display_name || cu?.username || 'Soul Contact',
-          avatarUrl: prof?.avatar_url || null,
-          bio: prof?.bio || null,
+          userId: c.contact_user_id,
+          username: (cu?.username as string) || 'user',
+          displayName: (prof?.display_name as string) || (cu?.username as string) || 'Soul Contact',
+          avatarUrl: (prof?.avatar_url as string) || null,
+          bio: (prof?.bio as string) || null,
           onlineStatus: Boolean(prof?.online_status),
-          lastSeen: prof?.last_seen || null,
+          lastSeen: (prof?.last_seen as string) || null,
           nickname: c.nickname,
           isFavorite: Boolean(c.is_favorite)
         };
@@ -390,10 +398,32 @@ Deno.serve(async (req: Request) => {
     if (route === '/users/blocked' && method === 'GET') {
       const { data, error } = await supabase
         .from('blocked_users')
-        .select('*, blocked_user:blocked_user_id(id, username, user_profiles(display_name, avatar_url))')
+        .select('*')
         .eq('user_id', currentUserId);
       if (error) throw error;
-      return jsonResponse({ success: true, blocked: data || [] });
+
+      const userMap = await fetchUsersMapWithProfiles(
+        supabase,
+        (data || []).map((b) => b.blocked_user_id)
+      );
+      const blockedList = (data || []).map((b) => {
+        const bu = userMap.get(b.blocked_user_id);
+        const prof = bu?.user_profiles as Record<string, unknown> | null;
+        return {
+          ...b,
+          blocked_user: bu
+            ? {
+                id: bu.id,
+                username: bu.username,
+                user_profiles: {
+                  display_name: prof?.display_name || null,
+                  avatar_url: prof?.avatar_url || null
+                }
+              }
+            : null
+        };
+      });
+      return jsonResponse({ success: true, blockedUsers: blockedList, blocked: blockedList });
     }
 
     if (route === '/users/block' && method === 'POST') {
@@ -652,20 +682,25 @@ Deno.serve(async (req: Request) => {
       const nowIso = new Date().toISOString();
       const { data, error } = await supabase
         .from('statuses')
-        .select('*, users:user_id(id, username, user_profiles(*)), status_views(*)')
+        .select('*, status_views(*)')
         .gt('expires_at', nowIso)
         .order('created_at', { ascending: false });
       if (error) throw error;
 
+      const userMap = await fetchUsersMapWithProfiles(
+        supabase,
+        (data || []).map((s) => s.user_id)
+      );
+
       const allStatuses = await Promise.all(
         (data || []).map(async (s) => {
-          const usr = Array.isArray(s.users) ? s.users[0] : s.users;
-          const prof = Array.isArray(usr?.user_profiles) ? usr?.user_profiles[0] : usr?.user_profiles;
+          const usr = userMap.get(s.user_id);
+          const prof = usr?.user_profiles as Record<string, unknown> | null;
           return {
             id: s.id,
             userId: s.user_id,
-            userName: prof?.display_name || usr?.username || 'Partner',
-            userAvatar: prof?.avatar_url || null,
+            userName: (prof?.display_name as string) || (usr?.username as string) || 'Partner',
+            userAvatar: (prof?.avatar_url as string) || null,
             type: s.status_type || 'text',
             content: s.content,
             gradient: s.background_color,
@@ -688,9 +723,9 @@ Deno.serve(async (req: Request) => {
 
     if (route === '/statuses' && method === 'POST') {
       const formData = await req.formData();
-      const statusType = String(formData.get('statusType') || 'text');
+      const statusType = String(formData.get('statusType') || 'text').slice(0, 20);
       const content = formData.get('content') ? String(formData.get('content')) : null;
-      const gradient = formData.get('gradient') ? String(formData.get('gradient')) : '#2e0854';
+      const gradient = (formData.get('gradient') ? String(formData.get('gradient')) : '#2e0854').slice(0, 30);
       const caption = formData.get('caption') ? String(formData.get('caption')) : null;
       const mediaFile = formData.get('media');
 
@@ -773,25 +808,29 @@ Deno.serve(async (req: Request) => {
     if (route === '/calls/history' && method === 'GET') {
       const { data, error } = await supabase
         .from('calls')
-        .select('*, caller:caller_id(id, username, user_profiles(*)), receiver:receiver_id(id, username, user_profiles(*))')
+        .select('*')
         .or(`caller_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
         .order('started_at', { ascending: false });
       if (error) throw error;
 
+      const userMap = await fetchUsersMapWithProfiles(
+        supabase,
+        (data || []).flatMap((c) => [c.caller_id, c.receiver_id])
+      );
+
       const calls = (data || []).map((c) => {
         const isCaller = c.caller_id === currentUserId;
-        const caller = Array.isArray(c.caller) ? c.caller[0] : c.caller;
-        const receiver = Array.isArray(c.receiver) ? c.receiver[0] : c.receiver;
-        const partner = isCaller ? receiver : caller;
-        const prof = Array.isArray(partner?.user_profiles) ? partner?.user_profiles[0] : partner?.user_profiles;
+        const partnerId = isCaller ? c.receiver_id : c.caller_id;
+        const partner = userMap.get(partnerId);
+        const prof = partner?.user_profiles as Record<string, unknown> | null;
 
         return {
           id: c.id,
           callerId: c.caller_id,
           receiverId: c.receiver_id,
-          partnerId: partner?.id || (isCaller ? c.receiver_id : c.caller_id),
-          partnerName: prof?.display_name || partner?.username || 'GOSH Connection',
-          partnerAvatar: prof?.avatar_url || null,
+          partnerId,
+          partnerName: (prof?.display_name as string) || (partner?.username as string) || 'GOSH Connection',
+          partnerAvatar: (prof?.avatar_url as string) || null,
           callType: c.call_type,
           direction: isCaller ? 'outgoing' : 'incoming',
           status: c.call_status,
@@ -841,16 +880,21 @@ Deno.serve(async (req: Request) => {
 
       const { data, error } = await supabase
         .from('memory_files')
-        .select('*, memory_albums(name), uploader:uploader_id(id, username, user_profiles(display_name))')
+        .select('*, memory_albums(name)')
         .in('space_id', spaceIds)
         .order('created_at', { ascending: false });
       if (error) throw error;
 
+      const userMap = await fetchUsersMapWithProfiles(
+        supabase,
+        (data || []).map((m) => m.uploader_id)
+      );
+
       const memories = await Promise.all(
         (data || []).map(async (m) => {
           const album = Array.isArray(m.memory_albums) ? m.memory_albums[0] : m.memory_albums;
-          const uploader = Array.isArray(m.uploader) ? m.uploader[0] : m.uploader;
-          const prof = Array.isArray(uploader?.user_profiles) ? uploader?.user_profiles[0] : uploader?.user_profiles;
+          const uploader = userMap.get(m.uploader_id);
+          const prof = uploader?.user_profiles as Record<string, unknown> | null;
           return {
             id: m.id,
             spaceId: m.space_id,
@@ -865,7 +909,7 @@ Deno.serve(async (req: Request) => {
             feelingsTag: m.feelings_tag,
             album: album?.name || 'All Memories',
             uploaderId: m.uploader_id,
-            uploaderName: prof?.display_name || uploader?.username || 'Soul Partner',
+            uploaderName: (prof?.display_name as string) || (uploader?.username as string) || 'Soul Partner',
             createdAt: m.created_at
           };
         })
@@ -1000,7 +1044,7 @@ Deno.serve(async (req: Request) => {
     // Settings & Passcode Vault
     const verifyPassMatch = route.match(/^\/settings\/([^/]+)\/verify-passcode$/);
     if (verifyPassMatch && method === 'POST') {
-      const targetUid = verifyPassMatch[1] === 'me' ? currentUserId : verifyPassMatch[1];
+      const targetUid = resolveSelfId(verifyPassMatch[1]);
       if (targetUid !== currentUserId) return jsonResponse({ success: false, message: 'Forbidden' }, 403);
       const { passcode } = await req.json();
       if (!passcode) return jsonResponse({ success: false, valid: false });
@@ -1016,7 +1060,7 @@ Deno.serve(async (req: Request) => {
 
     const settingsMatch = route.match(/^\/settings\/([^/]+)$/);
     if (settingsMatch) {
-      const targetUid = settingsMatch[1] === 'me' ? currentUserId : settingsMatch[1];
+      const targetUid = resolveSelfId(settingsMatch[1]);
       if (targetUid !== currentUserId) return jsonResponse({ success: false, message: 'Forbidden' }, 403);
 
       if (method === 'GET') {

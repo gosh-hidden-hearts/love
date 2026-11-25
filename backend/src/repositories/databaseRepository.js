@@ -35,6 +35,36 @@ function sanitizeUsernameBase(raw) {
   return `soul_${crypto.randomBytes(3).toString('hex')}`;
 }
 
+async function attachProfileToUser(userRow) {
+  if (!userRow?.id) return null;
+  const { data: prof, error } = await supabase
+    .from('user_profiles')
+    .select('*')
+    .eq('user_id', userRow.id)
+    .maybeSingle();
+  assertNoError(error, 'attachProfileToUser failed');
+  return { ...userRow, user_profiles: prof || null };
+}
+
+async function fetchUsersMapWithProfiles(userIds) {
+  const ids = Array.from(new Set(userIds.filter(isUuid)));
+  const map = new Map();
+  if (ids.length === 0) return map;
+
+  const [{ data: usersData, error: uErr }, { data: profilesData, error: pErr }] = await Promise.all([
+    supabase.from('users').select('id, username, status').in('id', ids),
+    supabase.from('user_profiles').select('*').in('user_id', ids)
+  ]);
+  assertNoError(uErr, 'fetchUsersMapWithProfiles(users) failed');
+  assertNoError(pErr, 'fetchUsersMapWithProfiles(user_profiles) failed');
+
+  const profileMap = new Map((profilesData || []).map((p) => [p.user_id, p]));
+  for (const u of usersData || []) {
+    map.set(u.id, { ...u, user_profiles: profileMap.get(u.id) || null });
+  }
+  return map;
+}
+
 export const db = {
   // =========================================================================
   // USERS, PROFILES & IDENTIFIERS (Supabase PostgreSQL ONLY)
@@ -43,26 +73,24 @@ export const db = {
     if (!isUuid(userId)) return null;
     const { data, error } = await supabase
       .from('users')
-      .select('*, user_profiles(*)')
+      .select('*')
       .eq('id', userId)
       .maybeSingle();
 
     assertNoError(error, 'findUserById failed');
-    if (!data) return null;
-    return { ...data, user_profiles: normalizeProfileJoin(data.user_profiles) };
+    return attachProfileToUser(data);
   },
 
   async findUserByFirebaseUid(firebaseUid) {
     if (!firebaseUid) return null;
     const { data, error } = await supabase
       .from('users')
-      .select('*, user_profiles(*)')
+      .select('*')
       .eq('firebase_uid', firebaseUid)
       .maybeSingle();
 
     assertNoError(error, 'findUserByFirebaseUid failed');
-    if (!data) return null;
-    return { ...data, user_profiles: normalizeProfileJoin(data.user_profiles) };
+    return attachProfileToUser(data);
   },
 
   async findUserByEmail(email) {
@@ -70,13 +98,12 @@ export const db = {
     const normalized = email.trim().toLowerCase();
     const { data, error } = await supabase
       .from('users')
-      .select('*, user_profiles(*)')
+      .select('*')
       .eq('email', normalized)
       .maybeSingle();
 
     assertNoError(error, 'findUserByEmail failed');
-    if (!data) return null;
-    return { ...data, user_profiles: normalizeProfileJoin(data.user_profiles) };
+    return attachProfileToUser(data);
   },
 
   async findUserByIdentifier(identifier) {
@@ -109,22 +136,22 @@ export const db = {
 
     const { data: byUsername, error: userErr } = await supabase
       .from('users')
-      .select('*, user_profiles(*)')
+      .select('*')
       .eq('username', normalized)
       .maybeSingle();
     assertNoError(userErr, 'findUserByIdentifier(username) failed');
     if (byUsername) {
-      return { ...byUsername, user_profiles: normalizeProfileJoin(byUsername.user_profiles) };
+      return attachProfileToUser(byUsername);
     }
 
     const { data: byMobile, error: mobErr } = await supabase
       .from('users')
-      .select('*, user_profiles(*)')
+      .select('*')
       .eq('mobile_number', rawTrimmed)
       .maybeSingle();
     assertNoError(mobErr, 'findUserByIdentifier(mobile) failed');
     if (byMobile) {
-      return { ...byMobile, user_profiles: normalizeProfileJoin(byMobile.user_profiles) };
+      return attachProfileToUser(byMobile);
     }
 
     return null;
@@ -446,51 +473,37 @@ export const db = {
 
     const pattern = `%${escapeIlike(raw.toLowerCase())}%`;
 
-    // Search by username (never searches or exposes private email/mobile)
-    const { data: byUsername, error: err1 } = await supabase
-      .from('users')
-      .select('id, username, user_profiles(display_name, avatar_url, bio, online_status)')
-      .ilike('username', pattern)
-      .limit(20);
+    // Search by username & display_name (never searches or exposes private email/mobile)
+    const [{ data: byUsername, error: err1 }, { data: byDisplayName, error: err2 }] = await Promise.all([
+      supabase.from('users').select('id').ilike('username', pattern).limit(20),
+      supabase.from('user_profiles').select('user_id').ilike('display_name', pattern).limit(20)
+    ]);
     assertNoError(err1, 'searchUsers(username) failed');
-
-    // Also search by display_name
-    const { data: byDisplayName, error: err2 } = await supabase
-      .from('user_profiles')
-      .select('user_id, display_name, avatar_url, bio, online_status, users!user_profiles_user_id_fkey(id, username)')
-      .ilike('display_name', pattern)
-      .limit(20);
     assertNoError(err2, 'searchUsers(display_name) failed');
 
-    const map = new Map();
-    for (const u of byUsername || []) {
-      if (u.id === excludeUserId) continue;
-      const prof = normalizeProfileJoin(u.user_profiles);
-      map.set(u.id, {
-        id: u.id,
-        username: u.username,
-        displayName: prof?.display_name || u.username,
-        avatarUrl: prof?.avatar_url || null,
-        bio: prof?.bio || 'In a love story written by the stars ✨',
-        onlineStatus: Boolean(prof?.online_status)
-      });
-    }
+    const candidateIds = Array.from(
+      new Set([
+        ...(byUsername || []).map((u) => u.id),
+        ...(byDisplayName || []).map((p) => p.user_id)
+      ])
+    ).filter((id) => Boolean(id) && id !== excludeUserId).slice(0, 20);
 
-    for (const p of byDisplayName || []) {
-      const uid = p.user_id;
-      if (!uid || uid === excludeUserId || map.has(uid)) continue;
-      const usr = Array.isArray(p.users) ? p.users[0] : p.users;
-      map.set(uid, {
-        id: uid,
-        username: usr?.username || 'user',
-        displayName: p.display_name || usr?.username || 'Soul Member',
-        avatarUrl: p.avatar_url || null,
-        bio: p.bio || 'In a love story written by the stars ✨',
-        onlineStatus: Boolean(p.online_status)
-      });
-    }
-
-    return Array.from(map.values()).slice(0, 20);
+    const userMap = await fetchUsersMapWithProfiles(candidateIds);
+    return candidateIds
+      .map((id) => {
+        const u = userMap.get(id);
+        if (!u) return null;
+        const prof = u.user_profiles;
+        return {
+          id: u.id,
+          username: u.username,
+          displayName: prof?.display_name || u.username || 'Soul Member',
+          avatarUrl: prof?.avatar_url || null,
+          bio: prof?.bio || 'In a love story written by the stars ✨',
+          onlineStatus: Boolean(prof?.online_status)
+        };
+      })
+      .filter(Boolean);
   },
 
   // =========================================================================
@@ -601,9 +614,11 @@ export const db = {
     const convIds = memberships.map((m) => m.conversation_id);
     const { data: allMembers, error: mErr } = await supabase
       .from('conversation_members')
-      .select('conversation_id, user_id, users(id, username, user_profiles(display_name, avatar_url, online_status, last_seen))')
+      .select('conversation_id, user_id')
       .in('conversation_id', convIds);
     assertNoError(mErr, 'getConversationsForUser(members) failed');
+
+    const userMap = await fetchUsersMapWithProfiles((allMembers || []).map((row) => row.user_id));
 
     const { data: userContacts, error: cErr } = await supabase
       .from('contacts')
@@ -627,10 +642,8 @@ export const db = {
       const partnerEntry = !isGroup
         ? participants.find((p) => p.user_id !== userId) || participants[0]
         : null;
-      const partnerUser = partnerEntry?.users
-        ? (Array.isArray(partnerEntry.users) ? partnerEntry.users[0] : partnerEntry.users)
-        : null;
-      const partnerProfile = normalizeProfileJoin(partnerUser?.user_profiles);
+      const partnerUser = partnerEntry?.user_id ? userMap.get(partnerEntry.user_id) || null : null;
+      const partnerProfile = partnerUser?.user_profiles || null;
 
       const partnerId = partnerUser?.id || partnerEntry?.user_id || null;
       const partnerNickname = partnerId ? nicknameMap.get(partnerId) : null;
@@ -971,15 +984,16 @@ export const db = {
 
     const { data, error } = await supabase
       .from('statuses')
-      .select('*, users:user_id(id, username, user_profiles(*)), status_views(*)')
+      .select('*, status_views(*)')
       .gt('expires_at', nowIso)
       .order('created_at', { ascending: false });
 
     assertNoError(error, 'getStatuses failed');
+    const userMap = await fetchUsersMapWithProfiles((data || []).map((s) => s.user_id));
 
     const allStatuses = (data || []).map((s) => {
-      const usr = Array.isArray(s.users) ? s.users[0] : s.users;
-      const prof = normalizeProfileJoin(usr?.user_profiles);
+      const usr = userMap.get(s.user_id);
+      const prof = usr?.user_profiles || null;
       return {
         id: s.id,
         userId: s.user_id,
@@ -1161,15 +1175,16 @@ export const db = {
 
     const { data, error } = await supabase
       .from('memory_files')
-      .select('*, memory_albums(name), uploader:uploader_id(id, username, user_profiles(display_name))')
+      .select('*, memory_albums(name)')
       .in('space_id', spaceIds)
       .order('created_at', { ascending: false });
     assertNoError(error, 'getMemories failed');
+    const userMap = await fetchUsersMapWithProfiles((data || []).map((m) => m.uploader_id));
 
     return (data || []).map((m) => {
       const album = Array.isArray(m.memory_albums) ? m.memory_albums[0] : m.memory_albums;
-      const uploader = Array.isArray(m.uploader) ? m.uploader[0] : m.uploader;
-      const uploaderProf = normalizeProfileJoin(uploader?.user_profiles);
+      const uploader = userMap.get(m.uploader_id);
+      const uploaderProf = uploader?.user_profiles || null;
 
       return {
         id: m.id,
@@ -1255,24 +1270,26 @@ export const db = {
 
     const { data, error } = await supabase
       .from('calls')
-      .select('*, caller:caller_id(id, username, user_profiles(*)), receiver:receiver_id(id, username, user_profiles(*))')
+      .select('*')
       .or(`caller_id.eq.${userId},receiver_id.eq.${userId}`)
       .order('started_at', { ascending: false });
 
     assertNoError(error, 'getCallHistory failed');
+    const userMap = await fetchUsersMapWithProfiles(
+      (data || []).flatMap((c) => [c.caller_id, c.receiver_id])
+    );
 
     return (data || []).map((c) => {
       const isCaller = c.caller_id === userId;
-      const caller = Array.isArray(c.caller) ? c.caller[0] : c.caller;
-      const receiver = Array.isArray(c.receiver) ? c.receiver[0] : c.receiver;
-      const partner = isCaller ? receiver : caller;
-      const partnerProf = normalizeProfileJoin(partner?.user_profiles);
+      const partnerId = isCaller ? c.receiver_id : c.caller_id;
+      const partner = userMap.get(partnerId);
+      const partnerProf = partner?.user_profiles || null;
 
       return {
         id: c.id,
         callerId: c.caller_id,
         receiverId: c.receiver_id,
-        partnerId: partner?.id || (isCaller ? c.receiver_id : c.caller_id),
+        partnerId,
         partnerName: partnerProf?.display_name || partner?.username || 'GOSH Connection',
         partnerAvatar: partnerProf?.avatar_url || null,
         callType: c.call_type,
@@ -1292,18 +1309,19 @@ export const db = {
 
     const { data, error } = await supabase
       .from('contacts')
-      .select('*, contact_user:contact_user_id(id, username, user_profiles(*))')
+      .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
     assertNoError(error, 'getContacts failed');
+    const userMap = await fetchUsersMapWithProfiles((data || []).map((c) => c.contact_user_id));
 
     return (data || []).map((c) => {
-      const cu = Array.isArray(c.contact_user) ? c.contact_user[0] : c.contact_user;
-      const prof = normalizeProfileJoin(cu?.user_profiles);
+      const cu = userMap.get(c.contact_user_id);
+      const prof = cu?.user_profiles || null;
       return {
         contactId: c.id,
-        userId: cu?.id || c.contact_user_id,
+        userId: c.contact_user_id,
         username: cu?.username,
         displayName: prof?.display_name || cu?.username || 'Soul Contact',
         avatarUrl: prof?.avatar_url || null,
@@ -1393,11 +1411,28 @@ export const db = {
 
     const { data, error } = await supabase
       .from('blocked_users')
-      .select('*, blocked_user:blocked_user_id(id, username, user_profiles(display_name, avatar_url))')
+      .select('*')
       .eq('user_id', userId);
 
     assertNoError(error, 'getBlockedUsers failed');
-    return data || [];
+    const userMap = await fetchUsersMapWithProfiles((data || []).map((b) => b.blocked_user_id));
+    return (data || []).map((b) => {
+      const bu = userMap.get(b.blocked_user_id);
+      const prof = bu?.user_profiles || null;
+      return {
+        ...b,
+        blocked_user: bu
+          ? {
+              id: bu.id,
+              username: bu.username,
+              user_profiles: {
+                display_name: prof?.display_name || null,
+                avatar_url: prof?.avatar_url || null
+              }
+            }
+          : null
+      };
+    });
   },
 
   async blockUser(userId, blockedUserId) {

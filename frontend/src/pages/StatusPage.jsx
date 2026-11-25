@@ -308,7 +308,7 @@ export default function StatusPage() {
                 <div className="absolute top-3 left-3 flex items-center gap-2">
                   <div className="p-0.5 rounded-full bg-gradient-to-tr from-rose-500 to-emerald-400">
                     <img
-                      src={status.userAvatar}
+                      src={status.userAvatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${status.userId || status.id}`}
                       alt={status.userName}
                       className="w-8 h-8 rounded-full object-cover border border-black"
                     />
@@ -353,7 +353,7 @@ export default function StatusPage() {
             <div className="flex items-center justify-between text-white">
               <div className="flex items-center gap-3">
                 <img
-                  src={activeStoryViewer.userAvatar}
+                  src={activeStoryViewer.userAvatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${activeStoryViewer.userId || activeStoryViewer.id}`}
                   alt={activeStoryViewer.userName}
                   className="w-10 h-10 rounded-full object-cover border-2 border-rose-500"
                 />
@@ -400,13 +400,23 @@ export default function StatusPage() {
             />
 
             {/* Media or Text Display */}
-            {activeStoryViewer.type === 'media' ? (
+            {(activeStoryViewer.type === 'media' || activeStoryViewer.type === 'photo' || activeStoryViewer.type === 'video') && activeStoryViewer.mediaUrl ? (
               <div className="relative max-h-[70vh] rounded-2xl overflow-hidden shadow-2xl">
-                <img
-                  src={activeStoryViewer.mediaUrl}
-                  alt="Story"
-                  className="w-full h-full object-contain"
-                />
+                {/\.(mp4|webm|mov|ogg)(\?|$)/i.test(activeStoryViewer.mediaUrl) ? (
+                  <video
+                    src={activeStoryViewer.mediaUrl}
+                    controls
+                    autoPlay
+                    playsInline
+                    className="w-full max-h-[70vh] object-contain"
+                  />
+                ) : (
+                  <img
+                    src={activeStoryViewer.mediaUrl}
+                    alt="Story"
+                    className="w-full h-full object-contain"
+                  />
+                )}
                 {activeStoryViewer.caption && (
                   <div className="absolute bottom-4 inset-x-4 bg-black/60 backdrop-blur-md p-3 rounded-xl text-center text-xs text-white">
                     {activeStoryViewer.caption}
