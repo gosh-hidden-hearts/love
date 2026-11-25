@@ -246,7 +246,7 @@ export default function DashboardLayout() {
                 onClick={() => navigate('/settings')}
                 className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 font-medium transition"
               >
-                Backend Settings
+                Connection Settings
               </button>
             </div>
           </div>
@@ -395,8 +395,8 @@ export default function DashboardLayout() {
                       <Heart className="w-4 h-4 fill-pink-400" />
                     </div>
                     <div className="text-left">
-                      <div className="text-xs font-semibold text-white">Memory Vault (MEGA Cloud)</div>
-                      <div className="text-[10px] text-slate-400">20GB private encrypted memory space</div>
+                      <div className="text-xs font-semibold text-white">Memory Vault (Supabase Cloud)</div>
+                      <div className="text-[10px] text-slate-400">Private encrypted memory storage</div>
                     </div>
                   </div>
                   <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-white transition" />

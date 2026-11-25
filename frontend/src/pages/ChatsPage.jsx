@@ -1333,7 +1333,7 @@ export default function ChatsPage() {
                               <div className="flex items-center gap-1.5 text-[10px] text-slate-300">
                                 {msg.fileSize && <span>{(msg.fileSize / 1024).toFixed(1)} KB</span>}
                                 <span>•</span>
-                                <span className="text-rose-300 font-semibold">☁️ MEGA Cloud</span>
+                                <span className="text-rose-300 font-semibold">☁️ Supabase Cloud</span>
                               </div>
                             </div>
                           </div>

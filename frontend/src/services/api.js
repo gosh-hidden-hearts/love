@@ -1,25 +1,32 @@
 import { auth } from './firebase';
+import { supabaseUrl, supabasePublishableKey } from './supabase';
 
 /**
- * GOSH Hidden Hearts - API Service Client
- * - Resolves backend URL from VITE_API_URL / VITE_API_BASE or localStorage override
- * - Attaches verified backend JWT or fresh Firebase ID token in Authorization header
- * - Never masks GitHub Pages static 404s as successful API calls
+ * GOSH Hidden Hearts - Serverless Supabase Edge + Optional Custom Backend API Client
+ * - Defaults to Supabase Edge Function: `${supabaseUrl}/functions/v1/gosh-api`
+ * - Supports optional override via localStorage (`gosh_backend_url`) or `VITE_API_URL`
+ * - Always authenticates via Firebase Auth ID token (`Authorization: Bearer <idToken>`)
  */
+
+export const getSupabaseEdgeBase = () => {
+  const base = (supabaseUrl || '').trim().replace(/\/+$/, '');
+  return base ? `${base}/functions/v1/gosh-api` : null;
+};
 
 export const getApiBase = () => {
   const customOverride = typeof localStorage !== 'undefined' ? localStorage.getItem('gosh_backend_url') : null;
   const envUrl = customOverride || import.meta.env.VITE_API_BASE || import.meta.env.VITE_API_URL;
   if (envUrl && envUrl.trim().length > 0) {
     const clean = envUrl.trim().replace(/\/+$/, '');
+    if (clean.includes('/functions/v1/')) return clean;
     return clean.endsWith('/api') ? clean : `${clean}/api`;
   }
-  if (typeof window !== 'undefined') {
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      return '/api';
-    }
-  }
-  return null;
+  return getSupabaseEdgeBase();
+};
+
+export const isUsingSupabaseEdge = () => {
+  const base = getApiBase() || '';
+  return base.includes('/functions/v1/');
 };
 
 export const isBackendConfigured = () => Boolean(getApiBase());
@@ -53,12 +60,12 @@ export const resolveFileUrl = (url) => {
   return `${origin}${url.startsWith('/') ? '' : '/'}${url}`;
 };
 
-export const API_BASE = getApiBase() || '/api';
+export const API_BASE = getApiBase() || getSupabaseEdgeBase();
 
 async function getAuthHeaders(extra = {}, includeJsonContentType = true) {
-  let token = typeof localStorage !== 'undefined' ? localStorage.getItem('gosh_jwt_token') : null;
+  let token = null;
 
-  if (!token && auth?.currentUser) {
+  if (auth?.currentUser) {
     try {
       token = await auth.currentUser.getIdToken();
     } catch {
@@ -66,9 +73,22 @@ async function getAuthHeaders(extra = {}, includeJsonContentType = true) {
     }
   }
 
+  if (!token && typeof localStorage !== 'undefined') {
+    token = localStorage.getItem('gosh_jwt_token');
+  }
+
   return {
     ...(includeJsonContentType ? { 'Content-Type': 'application/json' } : {}),
+    ...(isUsingSupabaseEdge() && supabasePublishableKey ? { apikey: supabasePublishableKey } : {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...extra
+  };
+}
+
+async function getPublicHeaders(extra = {}) {
+  return {
+    'Content-Type': 'application/json',
+    ...(isUsingSupabaseEdge() && supabasePublishableKey ? { apikey: supabasePublishableKey } : {}),
     ...extra
   };
 }
@@ -80,7 +100,7 @@ async function safeRequest(endpoint, options = {}, defaultData = {}) {
       success: false,
       offline: true,
       backendNotConfigured: true,
-      message: 'Backend server URL is not configured (VITE_API_URL). Please connect your Render backend URL in Settings or GitHub Secrets.',
+      message: 'API endpoint is not configured.',
       ...defaultData
     };
   }
@@ -100,7 +120,7 @@ async function safeRequest(endpoint, options = {}, defaultData = {}) {
         status: res.status,
         empty: true,
         message: res.status === 405 || res.status === 404
-          ? 'Backend endpoint not found on static host. Please connect your deployed backend server.'
+          ? 'API endpoint not found. Ensure the Supabase Edge Function gosh-api is deployed.'
           : (res.ok ? 'Operation completed successfully' : `Server responded with status ${res.status}`),
         ...defaultData
       };
@@ -115,7 +135,7 @@ async function safeRequest(endpoint, options = {}, defaultData = {}) {
           status: res.status,
           ...json
         };
-      } catch (parseErr) {
+      } catch {
         return {
           success: false,
           status: res.status,
@@ -131,7 +151,7 @@ async function safeRequest(endpoint, options = {}, defaultData = {}) {
       status: res.status,
       error: `Non-JSON response (${res.status})`,
       message: res.status === 404
-        ? 'Backend API not reachable at this address. Please verify your Render backend deployment.'
+        ? 'Supabase Edge Function gosh-api is not deployed yet or unreachable.'
         : `Server returned non-JSON response (${res.status})`,
       isHtml: contentType.includes('text/html'),
       ...defaultData
@@ -141,7 +161,7 @@ async function safeRequest(endpoint, options = {}, defaultData = {}) {
     return {
       success: false,
       error: netErr.message || 'Network request failed',
-      message: 'Unable to connect to the backend server. Please verify your internet connection or Render backend status.',
+      message: 'Unable to reach Supabase Edge Function. Check internet connection and verify gosh-api is deployed.',
       offline: true,
       ...defaultData
     };
@@ -149,7 +169,13 @@ async function safeRequest(endpoint, options = {}, defaultData = {}) {
 }
 
 export const api = {
-  // Agree and Continue Terms Acceptance
+  async checkHealth() {
+    return safeRequest('/health', {
+      method: 'GET',
+      headers: await getPublicHeaders()
+    });
+  },
+
   async recordTermsAcceptance(termsVersion = '1.0.0', privacyVersion = '1.0.0') {
     return safeRequest('/auth/terms-accept', {
       method: 'POST',
@@ -158,75 +184,46 @@ export const api = {
     });
   },
 
-  // Identifier Resolution (Username / Mobile -> Email)
   async resolveIdentifier(identifier) {
     return safeRequest('/auth/resolve-identifier', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getPublicHeaders(),
       body: JSON.stringify({ identifier })
     });
   },
 
-  // Check username, mobile & email uniqueness
   async checkAvailability(username, mobile, email = null) {
     return safeRequest('/auth/check-availability', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getPublicHeaders(),
       body: JSON.stringify({ username, mobile, email })
     });
   },
 
-  // Send Google SMTP OTP
   async sendOTP(email, purpose = 'signup', identifier = null) {
     return safeRequest('/auth/send-otp', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getPublicHeaders(),
       body: JSON.stringify({ email, purpose, identifier })
     });
   },
 
-  // Verify OTP
   async verifyOTP(email, otp, purpose = 'signup', identifier = null) {
     return safeRequest('/auth/verify-otp', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getPublicHeaders(),
       body: JSON.stringify({ email, otp, purpose, identifier })
     });
   },
 
-  // Login via Phone or Email + OTP
-  async loginWithOtp(identifier, otp) {
-    const data = await safeRequest('/auth/login-otp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifier, otp })
-    });
-    if (data?.token && typeof localStorage !== 'undefined') {
-      localStorage.setItem('gosh_jwt_token', data.token);
-    }
-    return data;
-  },
-
-  // Password Reset OTP Verification
-  async resetPasswordWithOtp(identifier, otp) {
-    return safeRequest('/auth/reset-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifier, otp })
-    });
-  },
-
-  // Sync / Initialize Verified Firebase User in Supabase via Backend
   async syncUser(firebaseIdToken, profileMetadata = {}) {
     if (!firebaseIdToken) {
       return { success: false, message: 'Firebase ID token is required to sync user.' };
     }
+    const headers = await getPublicHeaders({ Authorization: `Bearer ${firebaseIdToken}` });
     const data = await safeRequest('/auth/sync-user', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${firebaseIdToken}`
-      },
+      headers,
       body: JSON.stringify(profileMetadata)
     });
     if (data?.token && typeof localStorage !== 'undefined') {
@@ -235,7 +232,14 @@ export const api = {
     return data;
   },
 
-  // Contact Discovery & Search
+  async updatePresence(online) {
+    return safeRequest('/users/presence', {
+      method: 'POST',
+      headers: await getAuthHeaders(),
+      body: JSON.stringify({ online: Boolean(online) })
+    });
+  },
+
   async searchUsers(query) {
     return safeRequest(
       `/users/search?q=${encodeURIComponent(query || '')}`,
@@ -244,7 +248,6 @@ export const api = {
     );
   },
 
-  // Contact Management
   async getContacts() {
     return safeRequest(
       '/users/contacts',
@@ -276,7 +279,6 @@ export const api = {
     });
   },
 
-  // Blocked Users
   async getBlockedUsers() {
     return safeRequest(
       '/users/blocked',
@@ -301,7 +303,6 @@ export const api = {
     });
   },
 
-  // Profile Management
   async getProfile(userId) {
     return safeRequest(
       `/users/profile/${userId}`,
@@ -318,7 +319,6 @@ export const api = {
     });
   },
 
-  // Conversations & Messages
   async getConversations() {
     return safeRequest(
       '/conversations',
@@ -383,7 +383,6 @@ export const api = {
     });
   },
 
-  // Status / Stories
   async getStatuses() {
     return safeRequest(
       '/statuses',
@@ -415,7 +414,6 @@ export const api = {
     });
   },
 
-  // Calls
   async getCallHistory() {
     return safeRequest(
       '/calls/history',
@@ -432,7 +430,6 @@ export const api = {
     });
   },
 
-  // Memory Vault
   async getMemories() {
     return safeRequest(
       '/memory-vault',
@@ -456,7 +453,6 @@ export const api = {
     });
   },
 
-  // Settings & Passcode Vault
   async getSettings(userId) {
     return safeRequest(
       `/settings/${userId || 'me'}`,
@@ -481,7 +477,6 @@ export const api = {
     });
   },
 
-  // E2EE Public Keys
   async publishPublicKey(userId, publicKey) {
     return safeRequest('/users/public-key', {
       method: 'POST',

@@ -1,0 +1,4 @@
+project_id = "azwclorwxrzgofmribms"
+
+[functions.gosh-api]
+verify_jwt = false

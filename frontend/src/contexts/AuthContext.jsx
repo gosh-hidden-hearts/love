@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {
   auth,
   googleProvider,
@@ -9,6 +9,7 @@ import {
   getRedirectResult,
   signOut,
   sendPasswordResetEmail,
+  sendEmailVerification,
   updateProfile,
   onAuthStateChanged
 } from '../services/firebase';
@@ -70,6 +71,7 @@ export const AuthProvider = ({ children }) => {
   });
   const [loading, setLoading] = useState(true);
   const [syncError, setSyncError] = useState(null);
+  const signupInProgressRef = useRef(false);
   const [termsAccepted, setTermsAccepted] = useState(() => {
     return localStorage.getItem('gosh_terms_accepted') === 'true';
   });
@@ -123,6 +125,12 @@ export const AuthProvider = ({ children }) => {
       if (firebaseUser) {
         localStorage.setItem('gosh_terms_accepted', 'true');
         setTermsAccepted(true);
+
+        if (signupInProgressRef.current) {
+          // Wait for signup() to finish updateProfile & explicit syncWithBackend with username/mobile metadata
+          setLoading(false);
+          return;
+        }
 
         try {
           const synced = await syncWithBackend(firebaseUser);
@@ -202,20 +210,8 @@ export const AuthProvider = ({ children }) => {
     return synced.userObj;
   };
 
-  const loginWithOtp = async (identifier, otp) => {
-    const res = await api.loginWithOtp(identifier, otp);
-    if (!res.success) {
-      throw new Error(res.message || 'OTP Login failed. Please verify code.');
-    }
-
-    const userObj = buildUserObject(null, res.user, res.profile);
-    setSyncError(null);
-    localStorage.setItem('gosh_terms_accepted', 'true');
-    setTermsAccepted(true);
-    persistSessionState(userObj, res.profile || userObj);
-    socketService.connect(userObj);
-    encryptionService.initUserKeys(userObj.id).catch(console.warn);
-    return userObj;
+  const loginWithOtp = async () => {
+    throw new Error('Passwordless OTP login is disabled because Firebase Authentication is required. Please use Password Sign In or Google Sign In.');
   };
 
   const loginWithGoogle = async () => {
@@ -252,36 +248,47 @@ export const AuthProvider = ({ children }) => {
     await signInWithRedirect(auth, googleProvider);
   };
 
-  const signup = async ({ email, password, displayName, username, mobile }) => {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    const fbUser = userCredential.user;
+  const signup = async ({ email, password, displayName, username, mobile, sendVerificationEmail = false }) => {
+    signupInProgressRef.current = true;
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const fbUser = userCredential.user;
 
-    if (displayName) {
-      await updateProfile(fbUser, { displayName });
-    }
-
-    localStorage.setItem('gosh_terms_accepted', 'true');
-    setTermsAccepted(true);
-
-    const synced = await syncWithBackend(fbUser, {
-      displayName: displayName || email.split('@')[0],
-      username: username?.trim() || null,
-      mobile_number: mobile?.trim() || null
-    });
-
-    if (!synced.ok) {
-      if (synced.syncRes?.status === 409) {
-        throw new Error(synced.error);
+      if (displayName) {
+        await updateProfile(fbUser, { displayName });
       }
-      const fallbackObj = buildUserObject({
-        ...fbUser,
-        displayName: displayName || fbUser.displayName
-      });
-      persistSessionState(fallbackObj, fallbackObj);
-      return fallbackObj;
-    }
 
-    return synced.userObj;
+      if (sendVerificationEmail && !fbUser.emailVerified) {
+        sendEmailVerification(fbUser).catch((err) => {
+          console.warn('Firebase email verification dispatch notice:', err?.message);
+        });
+      }
+
+      localStorage.setItem('gosh_terms_accepted', 'true');
+      setTermsAccepted(true);
+
+      const synced = await syncWithBackend(fbUser, {
+        displayName: displayName || email.split('@')[0],
+        username: username?.trim() || null,
+        mobile_number: mobile?.trim() || null
+      });
+
+      if (!synced.ok) {
+        if (synced.syncRes?.status === 409) {
+          throw new Error(synced.error);
+        }
+        const fallbackObj = buildUserObject({
+          ...fbUser,
+          displayName: displayName || fbUser.displayName
+        });
+        persistSessionState(fallbackObj, fallbackObj);
+        return fallbackObj;
+      }
+
+      return synced.userObj;
+    } finally {
+      signupInProgressRef.current = false;
+    }
   };
 
   const logout = async () => {

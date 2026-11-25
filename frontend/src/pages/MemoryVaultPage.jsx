@@ -89,7 +89,7 @@ export default function MemoryVaultPage() {
     if (!selectedFile) return;
 
     setUploading(true);
-    setUploadProgress('Encrypting and streaming to MEGA Cloud Storage...');
+    setUploadProgress('Encrypting and uploading to Supabase Storage...');
 
     try {
       const formData = new FormData();
@@ -167,7 +167,7 @@ export default function MemoryVaultPage() {
           <div className="flex items-center gap-2">
             <h1 className="text-xl md:text-2xl font-bold text-white">Memory Vault</h1>
             <span className="text-[10px] bg-rose-500/20 text-rose-300 px-2.5 py-0.5 rounded-full font-semibold border border-rose-500/30">
-              MEGA Cloud Protected
+              Supabase Cloud Protected
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">Our shared sanctuary of photos, videos, voice memos, and love letters</p>
@@ -306,7 +306,7 @@ export default function MemoryVaultPage() {
                   {/* Action buttons */}
                   <div className="flex items-center justify-between pt-3 mt-3 border-t border-white/5 text-xs text-slate-400">
                     <span className="text-[10px] text-slate-500">
-                      {(mem.fileSize / (1024 * 1024)).toFixed(1)} MB • MEGA
+                      {(mem.fileSize / (1024 * 1024)).toFixed(1)} MB • Supabase Vault
                     </span>
 
                     <div className="flex items-center gap-1">
@@ -326,7 +326,7 @@ export default function MemoryVaultPage() {
                           target="_blank"
                           rel="noreferrer"
                           className="p-1.5 rounded-lg hover:bg-purple-500/20 text-slate-400 hover:text-purple-300 transition"
-                          title="Open on MEGA"
+                          title="Open Media"
                         >
                           <ExternalLink className="w-3.5 h-3.5" />
                         </a>
@@ -361,7 +361,7 @@ export default function MemoryVaultPage() {
           <div className="glass-panel w-full max-w-md p-6 rounded-3xl border border-rose-500/20 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-semibold text-white flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-rose-400" /> Upload to MEGA Cloud
+                <Sparkles className="w-4 h-4 text-rose-400" /> Upload to Memory Vault
               </h3>
               <button onClick={() => setShowUploadModal(false)} className="text-slate-400 hover:text-white">
                 <X className="w-5 h-5" />
@@ -399,7 +399,7 @@ export default function MemoryVaultPage() {
                 <label className="w-full h-36 rounded-2xl border-2 border-dashed border-white/20 hover:border-rose-500 flex flex-col items-center justify-center cursor-pointer transition">
                   <UploadCloud className="w-8 h-8 text-rose-400 mb-2" />
                   <span className="text-xs text-slate-300">Choose Photo, Video, Audio, or Document</span>
-                  <span className="text-[10px] text-slate-500 mt-1">Uploaded securely to MEGA Storage</span>
+                  <span className="text-[10px] text-slate-500 mt-1">Stored privately in Supabase Storage</span>
                   <input type="file" onChange={handleFileChange} className="hidden" required />
                 </label>
               )}

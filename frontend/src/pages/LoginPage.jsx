@@ -5,7 +5,6 @@ import {
   EyeOff, 
   Lock, 
   User, 
-  Phone,
   Mail,
   Heart, 
   Sparkles, 
@@ -23,7 +22,7 @@ import logoImg from '../assets/logo.png';
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, login, loginWithOtp, loginWithGoogle, loginWithGoogleRedirect, resetPassword } = useAuth();
+  const { user, login, loginWithGoogle, loginWithGoogleRedirect, resetPassword } = useAuth();
 
   // If already authenticated or becomes authenticated, redirect to /chats immediately
   useEffect(() => {
@@ -36,7 +35,6 @@ export default function LoginPage() {
   useEffect(() => {
     if (location.state?.email) {
       setIdentifier(location.state.email);
-      setOtpIdentifier(location.state.email);
       setForgotIdentifier(location.state.email);
     }
     if (location.state?.openForgot) {
@@ -44,9 +42,6 @@ export default function LoginPage() {
       setForgotStep(1);
     }
   }, [location.state]);
-
-  // Login Mode Tab
-  const [loginMode, setLoginMode] = useState('password'); // 'password' | 'otp'
 
   // Password Login state
   const [identifier, setIdentifier] = useState('');
@@ -56,20 +51,11 @@ export default function LoginPage() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Phone / Email OTP Login state
-  const [otpIdentifier, setOtpIdentifier] = useState('');
-  const [otpCode, setOtpCode] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpLoading, setOtpLoading] = useState(false);
-  const [otpMsg, setOtpMsg] = useState({ text: '', type: '' });
-  const [resendTimer, setResendTimer] = useState(0);
-
   // Forgot Password modal state
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [forgotIdentifier, setForgotIdentifier] = useState('');
-  const [forgotStep, setForgotStep] = useState(1); // 1: input identifier & send OTP, 2: verify OTP, 3: new password
+  const [forgotStep, setForgotStep] = useState(1); // 1: input identifier & send reset/OTP, 2: verify OTP, 3: send Firebase reset email
   const [forgotOtp, setForgotOtp] = useState('');
-  const [newPassword, setNewPassword] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotMsg, setForgotMsg] = useState({ text: '', type: '' });
   const [resolvedForgotEmail, setResolvedForgotEmail] = useState('');
@@ -101,68 +87,6 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Handle Send Login OTP
-  const handleSendLoginOtp = async (e) => {
-    e.preventDefault();
-    if (!otpIdentifier.trim()) {
-      setOtpMsg({ text: 'Please enter your registered mobile number or email.', type: 'error' });
-      return;
-    }
-
-    setOtpLoading(true);
-    setOtpMsg({ text: '', type: '' });
-    try {
-      const res = await api.sendOTP(null, 'login', otpIdentifier.trim());
-      if (res.success) {
-        setOtpSent(true);
-        setOtpMsg({ 
-          text: `A 6-digit login OTP was sent to ${res.email ? res.email.replace(/(.{2})(.*)(?=@)/, '$1***') : 'your registered contact'}.`, 
-          type: 'success' 
-        });
-        startResendTimer();
-      } else {
-        throw new Error(res.message || 'Failed to dispatch login OTP.');
-      }
-    } catch (err) {
-      setOtpMsg({ text: err.message || 'Could not send login OTP.', type: 'error' });
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-
-  // Handle Verify Login OTP
-  const handleVerifyLoginOtp = async (e) => {
-    e.preventDefault();
-    if (!otpCode.trim() || otpCode.trim().length !== 6) {
-      setOtpMsg({ text: 'Please enter the complete 6-digit OTP code.', type: 'error' });
-      return;
-    }
-
-    setOtpLoading(true);
-    setOtpMsg({ text: '', type: '' });
-    try {
-      await loginWithOtp(otpIdentifier.trim(), otpCode.trim());
-      navigate('/chats', { replace: true });
-    } catch (err) {
-      setOtpMsg({ text: err.message || 'OTP verification failed.', type: 'error' });
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-
-  const startResendTimer = () => {
-    setResendTimer(60);
-    const interval = setInterval(() => {
-      setResendTimer((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
   };
 
   // Google OAuth Login
@@ -215,6 +139,16 @@ export default function LoginPage() {
       if (otpRes.success) {
         setForgotStep(2);
         setForgotMsg({ text: `A 6-digit security OTP was sent to ${email.replace(/(.{2})(.*)(?=@)/, '$1***')}.`, type: 'success' });
+      } else if (otpRes.useFirebaseVerification || otpRes.code === 'EMAIL_PROVIDER_NOT_CONFIGURED' || otpRes.offline) {
+        await resetPassword(email);
+        setForgotMsg({
+          text: `A Firebase password reset link has been sent to ${email}. Check your inbox or spam folder.`,
+          type: 'success'
+        });
+        setTimeout(() => {
+          setShowForgotModal(false);
+          setForgotStep(1);
+        }, 3000);
       } else {
         throw new Error(otpRes.message || 'Failed to send OTP email.');
       }
@@ -249,20 +183,15 @@ export default function LoginPage() {
     e.preventDefault();
     setForgotLoading(true);
     try {
-      const res = await api.resetPasswordWithOtp(resolvedForgotEmail, forgotOtp.trim());
-      if (res.success) {
-        await resetPassword(resolvedForgotEmail);
-        setForgotMsg({
-          text: `OTP verified! A Firebase password reset email has been sent to ${resolvedForgotEmail}.`,
-          type: 'success'
-        });
-        setTimeout(() => {
-          setShowForgotModal(false);
-          setForgotStep(1);
-        }, 2500);
-      } else {
-        throw new Error(res.message || 'Password reset verification failed.');
-      }
+      await resetPassword(resolvedForgotEmail);
+      setForgotMsg({
+        text: `OTP verified! A Firebase password reset email has been sent to ${resolvedForgotEmail}.`,
+        type: 'success'
+      });
+      setTimeout(() => {
+        setShowForgotModal(false);
+        setForgotStep(1);
+      }, 2500);
     } catch (err) {
       setForgotMsg({ text: 'Could not reset password: ' + err.message, type: 'error' });
     } finally {
@@ -307,39 +236,6 @@ export default function LoginPage() {
               <p className="text-xs text-slate-400 mt-1">Sign in to access your private romantic communication space</p>
             </div>
 
-            {/* Login Method Switcher Tabs */}
-            <div className="grid grid-cols-2 gap-2 p-1 bg-black/40 rounded-xl mb-4 border border-white/5">
-              <button
-                type="button"
-                onClick={() => {
-                  setLoginMode('password');
-                  setError('');
-                }}
-                className={`py-2 rounded-lg text-xs font-semibold transition ${
-                  loginMode === 'password'
-                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30 shadow-glow-pink'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Password Sign In
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setLoginMode('otp');
-                  setError('');
-                  setOtpMsg({ text: '', type: '' });
-                }}
-                className={`py-2 rounded-lg text-xs font-semibold transition ${
-                  loginMode === 'otp'
-                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30 shadow-glow-pink'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Phone / Email OTP
-              </button>
-            </div>
-
             {/* Error Alert */}
             {error && (
               <div className="mb-4 p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2.5 animate-fadeIn">
@@ -349,198 +245,82 @@ export default function LoginPage() {
             )}
 
             {/* =========================================================================
-                TAB 1: PASSWORD LOGIN (Username, Email, or Mobile + Password)
+                PASSWORD LOGIN (Username, Email, or Mobile + Password via Firebase Auth)
                ========================================================================= */}
-            {loginMode === 'password' && (
-              <form onSubmit={handlePasswordSubmit} className="space-y-3.5">
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
-                    Login ID <span className="text-slate-500 font-normal">(Email, @username, or Mobile)</span>
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                      <User className="w-4 h-4" />
-                    </div>
-                    <input
-                      type="text"
-                      value={identifier}
-                      onChange={(e) => setIdentifier(e.target.value)}
-                      placeholder="you@domain.com or @username or +91..."
-                      className="w-full pl-10 pr-4 py-2.5 rounded-xl glass-input text-sm text-white placeholder-slate-500 focus:outline-none transition"
-                      required
-                    />
+            <form onSubmit={handlePasswordSubmit} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Login ID <span className="text-slate-500 font-normal">(Email, @username, or Mobile)</span>
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <User className="w-4 h-4" />
                   </div>
+                  <input
+                    type="text"
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    placeholder="you@domain.com or @username or +91..."
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl glass-input text-sm text-white placeholder-slate-500 focus:outline-none transition"
+                    required
+                  />
                 </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-medium text-slate-300">
-                      Password
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowForgotModal(true);
-                        setForgotStep(1);
-                        setForgotMsg({ text: '', type: '' });
-                      }}
-                      className="text-xs text-rose-400 hover:text-rose-300 transition"
-                    >
-                      Forgot Password?
-                    </button>
-                  </div>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                      <Lock className="w-4 h-4" />
-                    </div>
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••••••"
-                      className="w-full pl-10 pr-11 py-2.5 rounded-xl glass-input text-sm text-white placeholder-slate-500 focus:outline-none transition"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-white transition"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-3 rounded-xl btn-romantic-primary font-semibold text-sm flex items-center justify-center gap-2 transition disabled:opacity-60 mt-1 cursor-pointer"
-                >
-                  {loading ? (
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <>
-                      <span>Sign In to GOSH</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
-              </form>
-            )}
-
-            {/* =========================================================================
-                TAB 2: PHONE / EMAIL OTP LOGIN (WhatsApp style)
-               ========================================================================= */}
-            {loginMode === 'otp' && (
-              <div className="space-y-3.5">
-                {otpMsg.text && (
-                  <div className={`p-3 rounded-xl text-xs flex items-center gap-2 animate-fadeIn ${
-                    otpMsg.type === 'success' 
-                      ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-300' 
-                      : 'bg-rose-500/15 border border-rose-500/30 text-rose-300'
-                  }`}>
-                    {otpMsg.type === 'success' ? <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> : <AlertCircle className="w-4 h-4 flex-shrink-0" />}
-                    <span>{otpMsg.text}</span>
-                  </div>
-                )}
-
-                {!otpSent ? (
-                  <form onSubmit={handleSendLoginOtp} className="space-y-3.5">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-300 mb-1">
-                        Phone Number or Email
-                      </label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                          <Phone className="w-4 h-4" />
-                        </div>
-                        <input
-                          type="text"
-                          value={otpIdentifier}
-                          onChange={(e) => setOtpIdentifier(e.target.value)}
-                          placeholder="+91... or email@domain.com"
-                          className="w-full pl-10 pr-4 py-2.5 rounded-xl glass-input text-sm text-white placeholder-slate-500 focus:outline-none transition"
-                          required
-                        />
-                      </div>
-                      <p className="text-[11px] text-slate-400 mt-1">We will send a 6-digit OTP code to verify your account.</p>
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={otpLoading}
-                      className="w-full py-3 rounded-xl btn-romantic-primary font-semibold text-sm flex items-center justify-center gap-2 transition disabled:opacity-60 cursor-pointer"
-                    >
-                      {otpLoading ? (
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      ) : (
-                        <>
-                          <span>Send 6-Digit Login Code</span>
-                          <ArrowRight className="w-4 h-4" />
-                        </>
-                      )}
-                    </button>
-                  </form>
-                ) : (
-                  <form onSubmit={handleVerifyLoginOtp} className="space-y-3.5">
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="block text-xs font-medium text-slate-300">
-                          Verification Code
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setOtpSent(false);
-                            setOtpCode('');
-                          }}
-                          className="text-xs text-rose-400 hover:underline"
-                        >
-                          Change ID
-                        </button>
-                      </div>
-                      <input
-                        type="text"
-                        maxLength={6}
-                        value={otpCode}
-                        onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
-                        placeholder="••••••"
-                        className="w-full text-center tracking-[0.5em] text-xl font-mono px-4 py-2.5 rounded-xl glass-input text-white placeholder-slate-500 focus:outline-none"
-                        autoFocus
-                        required
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={otpLoading}
-                      className="w-full py-3 rounded-xl btn-romantic-green font-semibold text-sm flex items-center justify-center gap-2 transition disabled:opacity-60 cursor-pointer"
-                    >
-                      {otpLoading ? (
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      ) : (
-                        <>
-                          <span>Verify & Enter GOSH</span>
-                          <ShieldCheck className="w-4 h-4" />
-                        </>
-                      )}
-                    </button>
-
-                    {/* Resend OTP */}
-                    <div className="text-center pt-1">
-                      <button
-                        type="button"
-                        disabled={resendTimer > 0 || otpLoading}
-                        onClick={handleSendLoginOtp}
-                        className="text-xs text-slate-400 hover:text-rose-300 disabled:opacity-50 transition"
-                      >
-                        {resendTimer > 0 ? `Resend OTP in ${resendTimer}s` : 'Resend OTP Code'}
-                      </button>
-                    </div>
-                  </form>
-                )}
               </div>
-            )}
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-medium text-slate-300">
+                    Password
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForgotModal(true);
+                      setForgotStep(1);
+                      setForgotMsg({ text: '', type: '' });
+                    }}
+                    className="text-xs text-rose-400 hover:text-rose-300 transition"
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••••••"
+                    className="w-full pl-10 pr-11 py-2.5 rounded-xl glass-input text-sm text-white placeholder-slate-500 focus:outline-none transition"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-white transition"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3 rounded-xl btn-romantic-primary font-semibold text-sm flex items-center justify-center gap-2 transition disabled:opacity-60 mt-1 cursor-pointer"
+              >
+                {loading ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <span>Sign In to GOSH</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </form>
 
             {/* Divider */}
             <div className="relative my-3.5">
@@ -688,8 +468,8 @@ export default function LoginPage() {
               <Sparkles className="w-4 h-4 text-rose-400" /> Account Recovery
             </h3>
             <p className="text-xs text-slate-400 mb-4">
-              {forgotStep === 1 && 'Enter your registered email, username, or mobile to receive a 6-digit OTP.'}
-              {forgotStep === 2 && 'Enter the 6-digit OTP code sent via Google SMTP.'}
+              {forgotStep === 1 && 'Enter your registered email, username, or mobile to receive a password reset email.'}
+              {forgotStep === 2 && 'Enter the 6-digit OTP code sent to your email.'}
               {forgotStep === 3 && 'Click below to send a secure Firebase password reset link to your email.'}
             </p>
 
@@ -723,7 +503,7 @@ export default function LoginPage() {
                     disabled={forgotLoading}
                     className="px-5 py-2.5 rounded-xl btn-romantic-primary text-xs font-medium"
                   >
-                    {forgotLoading ? 'Sending OTP...' : 'Send OTP via Email'}
+                    {forgotLoading ? 'Sending...' : 'Continue Recovery'}
                   </button>
                 </div>
               </form>

@@ -83,9 +83,12 @@ export default function SignupPage() {
 
     setLoading(true);
     try {
-      // 1. Check availability with backend (email, username, mobile)
+      // 1. Check availability with Edge API (email, username, mobile)
       const availCheck = await api.checkAvailability(cleanUsername, cleanMobile, cleanEmail);
-      if (!availCheck.available) {
+      if (!availCheck.success) {
+        throw new Error(availCheck.message || 'Unable to verify account availability. Check Edge Function connection.');
+      }
+      if (availCheck.available === false) {
         if (availCheck.field === 'email' || availCheck.code === 'EMAIL_ALREADY_IN_USE') {
           setExistingAccountEmail(cleanEmail);
           setError(availCheck.message || 'An account with this email address already exists. Please sign in or reset your password.');
@@ -109,15 +112,33 @@ export default function SignupPage() {
           setError('An account with this email address already exists. Please sign in or reset your password.');
           return;
         }
-        // If network / enumeration restricted, continue to secure OTP dispatch
+        // If network / enumeration restricted, continue cleanly
       }
 
-      // 3. Send Google SMTP OTP
+      // 3. Send verification OTP via Edge API (or fall back to Firebase Email Verification when Resend isn't configured)
       const otpRes = await api.sendOTP(cleanEmail, 'signup');
       if (otpRes.success) {
         setCurrentStep(2);
-        setSuccessMsg(`A 6-digit verification code has been dispatched to ${cleanEmail} via Google SMTP.`);
+        setSuccessMsg(`A 6-digit verification code has been dispatched to ${cleanEmail}.`);
         startResendTimer();
+      } else if (otpRes.useFirebaseVerification || otpRes.code === 'EMAIL_PROVIDER_NOT_CONFIGURED') {
+        await signup({
+          email: cleanEmail,
+          password,
+          displayName: displayName.trim(),
+          username: cleanUsername || cleanEmail.split('@')[0],
+          mobile: cleanMobile || null,
+          sendVerificationEmail: true
+        });
+
+        confetti({
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#f43f5e', '#ec4899', '#c084fc', '#25d366']
+        });
+
+        navigate('/chats', { replace: true });
       } else {
         if (otpRes.code === 'EMAIL_ALREADY_IN_USE' || (otpRes.message && otpRes.message.includes('already exists'))) {
           setExistingAccountEmail(cleanEmail);
@@ -229,7 +250,7 @@ export default function SignupPage() {
     setError('');
     setGoogleLoading(true);
     try {
-      if (useRedirect) {
+      if (useRedirect === true) {
         await loginWithGoogleRedirect();
         return;
       }
@@ -505,7 +526,7 @@ export default function SignupPage() {
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
-                  <span>Send Verification OTP</span>
+                  <span>Continue &amp; Verify Email</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}

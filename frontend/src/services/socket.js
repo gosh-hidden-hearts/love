@@ -1,102 +1,235 @@
-import { io } from 'socket.io-client';
+import supabase, { supabaseUrl, supabasePublishableKey } from './supabase';
+import api from './api';
 
-class SocketService {
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * GOSH Realtime Service powered by Supabase Realtime (Broadcast + Presence)
+ * Preserves the socketService event interface (.connect, .disconnect, .emit, .on, .off)
+ * so chat messaging, typing indicators, online presence, and WebRTC signaling
+ * work serverlessly on GitHub Pages without a separate Socket.IO host.
+ */
+class SupabaseRealtimeService {
   constructor() {
-    this.socket = null;
     this.currentUser = null;
+    this.userChannel = null;
+    this.presenceChannel = null;
+    this.listeners = new Map(); // event -> Set<callback>
   }
 
-  getSocketServerUrl() {
-    const customOverride = typeof localStorage !== 'undefined' ? localStorage.getItem('gosh_backend_url') : null;
-    const customSocketUrl = customOverride || import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_API_URL;
-    if (customSocketUrl && customSocketUrl.trim().length > 0) {
-      return customSocketUrl.trim().replace(/\/api\/?$/, '').replace(/\/+$/, '');
-    }
-    if (typeof window !== 'undefined') {
-      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        return 'http://localhost:5000';
+  _dispatch(event, payload) {
+    const callbacks = this.listeners.get(event);
+    if (!callbacks) return;
+    callbacks.forEach((cb) => {
+      try {
+        cb(payload);
+      } catch (err) {
+        console.warn(`Realtime listener error (${event}):`, err);
       }
+    });
+  }
+
+  async _broadcastToUser(targetUserId, event, payload) {
+    if (!targetUserId || !supabaseUrl || !supabasePublishableKey) return;
+    const base = supabaseUrl.replace(/\/+$/, '');
+    try {
+      await fetch(`${base}/realtime/v1/api/broadcast`, {
+        method: 'POST',
+        headers: {
+          apikey: supabasePublishableKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              topic: `gosh:user:${targetUserId}`,
+              event,
+              payload,
+              private: false
+            }
+          ]
+        })
+      });
+    } catch (err) {
+      console.warn(`Supabase Realtime broadcast error (${event}):`, err.message);
     }
-    return null;
   }
 
   connect(user) {
-    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('gosh_jwt_token') : null;
-    if (!token || !user?.id) {
+    if (!user?.id || !UUID_REGEX.test(user.id)) {
       return null;
     }
 
-    if (this.socket && this.socket.connected) {
-      if (this.currentUser?.id === user?.id) return this.socket;
+    if (this.currentUser?.id === user.id && this.userChannel) {
+      return this.userChannel;
+    }
+
+    if (this.userChannel || this.presenceChannel) {
       this.disconnect();
-    }
-
-    const serverUrl = this.getSocketServerUrl();
-    if (!serverUrl) {
-      console.info('ℹ️ No backend Socket URL configured (VITE_SOCKET_URL). Realtime socket paused.');
-      return null;
     }
 
     this.currentUser = user;
 
-    this.socket = io(serverUrl, {
-      transports: ['websocket', 'polling'],
-      auth: { token },
-      autoConnect: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1000
+    // 1. Subscribe to personal inbox & signaling broadcast channel
+    const userTopic = `gosh:user:${user.id}`;
+    this.userChannel = supabase.channel(userTopic);
+
+    const inboundEvents = [
+      'receive_message',
+      'user_typing',
+      'user_stop_typing',
+      'message_blocked',
+      'incoming_call',
+      'call_accepted',
+      'call_rejected',
+      'call_ended',
+      'ice_candidate'
+    ];
+
+    inboundEvents.forEach((evt) => {
+      this.userChannel.on('broadcast', { event: evt }, (msg) => {
+        this._dispatch(evt, msg?.payload ?? msg);
+      });
     });
 
-    this.socket.on('connect', () => {
-      console.log('⚡ Connected to GOSH Realtime Server. Socket ID:', this.socket.id);
-      if (user) {
-        this.socket.emit('user_online', {
-          displayName: user.displayName || user.email?.split('@')[0],
-          avatarUrl: user.avatarUrl || user.photoURL
-        });
+    this.userChannel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        console.log('⚡ Subscribed to GOSH Supabase Realtime inbox:', userTopic);
       }
     });
 
-    this.socket.on('connect_error', (err) => {
-      console.warn('Socket connection error:', err.message);
+    // 2. Subscribe to global presence channel
+    this.presenceChannel = supabase.channel('gosh:presence', {
+      config: { presence: { key: user.id } }
     });
 
-    this.socket.on('disconnect', (reason) => {
-      console.log('Disconnected from GOSH Realtime Server:', reason);
-    });
+    this.presenceChannel
+      .on('presence', { event: 'join' }, ({ key }) => {
+        if (key) {
+          this._dispatch('presence_update', { userId: key, online: true, lastSeen: 'Online' });
+        }
+      })
+      .on('presence', { event: 'leave' }, ({ key }) => {
+        if (key) {
+          this._dispatch('presence_update', {
+            userId: key,
+            online: false,
+            lastSeen: new Date().toISOString()
+          });
+        }
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await this.presenceChannel.track({
+            user_id: user.id,
+            display_name: user.displayName || user.username,
+            online_at: new Date().toISOString()
+          });
+          api.updatePresence(true).catch(() => {});
+        }
+      });
 
-    return this.socket;
+    return this.userChannel;
   }
 
   disconnect() {
-    if (this.socket) {
-      if (this.currentUser) {
-        this.socket.emit('user_offline', { userId: this.currentUser.id || this.currentUser.uid });
-      }
-      this.socket.disconnect();
-      this.socket = null;
-      this.currentUser = null;
+    if (this.currentUser?.id) {
+      api.updatePresence(false).catch(() => {});
     }
+    if (this.userChannel) {
+      supabase.removeChannel(this.userChannel);
+      this.userChannel = null;
+    }
+    if (this.presenceChannel) {
+      supabase.removeChannel(this.presenceChannel);
+      this.presenceChannel = null;
+    }
+    this.currentUser = null;
   }
 
-  emit(event, data) {
-    if (this.socket) {
-      this.socket.emit(event, data);
+  emit(event, data = {}) {
+    if (!this.currentUser?.id) return;
+
+    switch (event) {
+      case 'user_online':
+        api.updatePresence(true).catch(() => {});
+        break;
+      case 'user_offline':
+        this.disconnect();
+        break;
+      case 'send_message':
+        // Edge Function gosh-api persists to PostgreSQL and broadcasts `receive_message` atomically.
+        break;
+      case 'typing':
+        if (data.targetUserId) {
+          this._broadcastToUser(data.targetUserId, 'user_typing', {
+            userId: this.currentUser.id,
+            conversationId: data.conversationId
+          });
+        }
+        break;
+      case 'stop_typing':
+        if (data.targetUserId) {
+          this._broadcastToUser(data.targetUserId, 'user_stop_typing', {
+            userId: this.currentUser.id,
+            conversationId: data.conversationId
+          });
+        }
+        break;
+      case 'call_user':
+        if (data.receiverId) {
+          this._broadcastToUser(data.receiverId, 'incoming_call', {
+            ...data,
+            callerId: this.currentUser.id
+          });
+        }
+        break;
+      case 'accept_call':
+        if (data.callerId) {
+          this._broadcastToUser(data.callerId, 'call_accepted', {
+            ...data,
+            responderId: this.currentUser.id
+          });
+        }
+        break;
+      case 'reject_call':
+        if (data.callerId) {
+          this._broadcastToUser(data.callerId, 'call_rejected', data);
+        }
+        break;
+      case 'end_call':
+        if (data.targetUserId) {
+          this._broadcastToUser(data.targetUserId, 'call_ended', data);
+        }
+        break;
+      case 'ice_candidate':
+        if (data.targetUserId) {
+          this._broadcastToUser(data.targetUserId, 'ice_candidate', data);
+        }
+        break;
+      default:
+        break;
     }
   }
 
   on(event, callback) {
-    if (this.socket) {
-      this.socket.on(event, callback);
+    if (!callback) return;
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, new Set());
     }
+    this.listeners.get(event).add(callback);
   }
 
   off(event, callback) {
-    if (this.socket) {
-      this.socket.off(event, callback);
+    const callbacks = this.listeners.get(event);
+    if (!callbacks) return;
+    if (callback) {
+      callbacks.delete(callback);
+    } else {
+      callbacks.clear();
     }
   }
 }
 
-export const socketService = new SocketService();
+export const socketService = new SupabaseRealtimeService();
 export default socketService;

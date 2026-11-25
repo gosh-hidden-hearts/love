@@ -51,7 +51,7 @@ export const TermsModal = ({ isOpen, onClose }) => {
               <Lock className="w-4 h-4 text-purple-400" /> 3. Memory Vault & Cloud Storage
             </h3>
             <p>
-              Shared memories, media, and love notes stored within the Memory Vault are synchronized securely using MEGA Cloud Storage. Only explicitly invited and authorized partners have access to your private vault spaces.
+              Shared memories, media, and love notes stored within the Memory Vault are synchronized securely using Supabase Cloud Storage. Only explicitly invited and authorized partners have access to your private vault spaces.
             </p>
           </section>
 
@@ -128,7 +128,7 @@ export const PrivacyModal = ({ isOpen, onClose }) => {
           <section>
             <h3 className="text-white font-medium mb-1">3. Shared Memory Vault Security</h3>
             <p>
-              Media uploaded to the Memory Vault is stored on encrypted MEGA Cloud infrastructure. Metadata is restricted to verified members of that couple connection.
+              Media uploaded to the Memory Vault is stored on private encrypted Supabase Cloud infrastructure. Metadata is restricted to verified members of that couple connection.
             </p>
           </section>
 
