@@ -22,24 +22,16 @@ import {
   Heart,
   HardDrive,
   Smartphone,
-  Shield,
-  CheckCircle2,
-  Server,
-  Globe,
-  Wifi,
-  RefreshCw,
-  AlertCircle
+  CheckCircle2
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { TermsModal, PrivacyModal } from '../components/TermsModal';
-import api, { getCustomBackendUrl, setCustomBackendUrl, getApiBase, isUsingSupabaseEdge } from '../services/api';
-import { supabasePublishableKey } from '../services/supabase';
-import socketService from '../services/socket';
+import api from '../services/api';
 import logoImg from '../assets/logo.png';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
-  const { user, profile, retryBackendSync, logout, isVaultLocked, setIsVaultLocked } = useAuth();
+  const { user, profile, logout, isVaultLocked, setIsVaultLocked } = useAuth();
 
   // Settings State
   const [theme, setTheme] = useState('romantic-dark');
@@ -66,77 +58,6 @@ export default function SettingsPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [saveSettingsSuccess, setSaveSettingsSuccess] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
-
-  // Backend & Cloud Services State
-  const [backendInput, setBackendInput] = useState(() => getCustomBackendUrl() || import.meta.env.VITE_API_URL || '');
-  const [backendStatus, setBackendStatus] = useState(null);
-
-  const probeBackendHealth = async (targetOverride = null, saveOnSuccess = false) => {
-    setBackendStatus({ checking: true });
-    const target = (targetOverride !== null ? targetOverride : backendInput).trim();
-
-    try {
-      let data = {};
-      if (!target) {
-        const base = getApiBase();
-        if (!base) {
-          setBackendStatus({
-            ok: false,
-            notConfigured: true,
-            error: 'Supabase URL is not configured in the build environment.'
-          });
-          return;
-        }
-        data = await api.checkHealth();
-        if (!data?.success || data?.status !== 'online') {
-          setBackendStatus({ ok: false, error: data?.message || 'Supabase Edge Function gosh-api is not reachable yet.' });
-          return;
-        }
-      } else {
-        const clean = target.replace(/\/+$/, '');
-        const isEdge = clean.includes('/functions/v1/');
-        const testUrl = isEdge
-          ? `${clean}/health`
-          : (clean.endsWith('/api') ? `${clean}/health` : `${clean}/api/health`);
-        const headers = isEdge && supabasePublishableKey ? { apikey: supabasePublishableKey } : {};
-        const res = await fetch(testUrl, { headers });
-        const text = await res.text();
-        try {
-          data = JSON.parse(text);
-        } catch {
-          throw new Error(`Server returned non-JSON response (${res.status})`);
-        }
-        if (!res.ok || data?.status !== 'online') {
-          setBackendStatus({ ok: false, error: data?.message || `Health check failed with status ${res.status}` });
-          return;
-        }
-      }
-
-      if (saveOnSuccess) {
-        setCustomBackendUrl(target);
-      }
-      setBackendStatus({ ok: true, data, error: null });
-      if (saveOnSuccess && user) {
-        await retryBackendSync?.();
-        socketService.connect(user);
-      }
-    } catch (err) {
-      setBackendStatus({ ok: false, error: 'Connection failed: ' + (err.message || 'Network error') });
-    }
-  };
-
-  const handleTestBackendConnection = () => probeBackendHealth(backendInput, true);
-
-  const handleResetBackend = () => {
-    setCustomBackendUrl('');
-    setBackendInput('');
-    setBackendStatus(null);
-    probeBackendHealth('', false);
-  };
-
-  useEffect(() => {
-    probeBackendHealth(backendInput, false);
-  }, []);
 
   // Load persisted settings on mount
   useEffect(() => {
@@ -601,156 +522,22 @@ export default function SettingsPage() {
         </div>
 
         {/* =========================================================================
-            SERVERLESS SUPABASE EDGE & CLOUD SERVICE HUB
-           ========================================================================= */}
-        <div className="glass-panel p-5 rounded-2xl border border-white/5 space-y-4">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-              <Server className="w-4 h-4 text-purple-400" /> Serverless Edge &amp; Cloud Services
-            </h3>
-            <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-mono border ${
-              backendStatus?.checking
-                ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                : backendStatus?.ok
-                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                  : 'bg-rose-500/15 text-rose-300 border-rose-500/30'
-            }`}>
-              {backendStatus?.checking
-                ? 'Checking...'
-                : backendStatus?.ok
-                  ? (isUsingSupabaseEdge() ? 'Supabase Edge Connected' : 'Gateway Connected')
-                  : backendStatus?.notConfigured
-                    ? 'Not Configured'
-                    : 'Edge Offline'}
-            </span>
-          </div>
-
-          <p className="text-xs text-slate-300 leading-relaxed">
-            GitHub Pages hosts the static interface. Firebase Auth handles identity, while Supabase Edge Functions, PostgreSQL, Realtime Broadcast, and Storage power GOSH serverlessly with zero separate server required.
-          </p>
-
-          <div className="space-y-3 pt-1">
-            <label className="block text-xs font-medium text-slate-300">
-              Custom API URL Override <span className="text-slate-500">(Optional — leave blank to use built-in Supabase Edge)</span>
-            </label>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <input
-                type="url"
-                value={backendInput}
-                onChange={(e) => setBackendInput(e.target.value)}
-                placeholder="Default: Built-in Supabase Edge (gosh-api)"
-                className="flex-1 py-2 px-3 rounded-xl glass-input text-xs text-white placeholder-slate-500 focus:outline-none"
-              />
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={handleTestBackendConnection}
-                  disabled={backendStatus?.checking}
-                  className="px-4 py-2 rounded-xl btn-romantic-primary text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${backendStatus?.checking ? 'animate-spin' : ''}`} />
-                  <span>{backendStatus?.checking ? 'Testing...' : 'Test & Connect'}</span>
-                </button>
-                {backendInput && (
-                  <button
-                    type="button"
-                    onClick={handleResetBackend}
-                    className="px-3 py-2 rounded-xl btn-romantic-secondary text-xs text-slate-400 hover:text-white"
-                  >
-                    Reset
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Health Check Results */}
-            {backendStatus && !backendStatus.checking && (
-              <div className={`p-3.5 rounded-xl border text-xs ${
-                backendStatus.ok ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
-              }`}>
-                {backendStatus.ok ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 font-semibold text-emerald-400">
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>Connected successfully to GOSH Cloud Services!</span>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-[11px]">
-                      <div className="bg-black/30 p-2 rounded-lg border border-white/5">
-                        <span className="text-slate-400 block">Supabase DB</span>
-                        <span className="text-white font-medium capitalize">{backendStatus.data?.services?.supabase || 'Connected'}</span>
-                      </div>
-                      <div className="bg-black/30 p-2 rounded-lg border border-white/5">
-                        <span className="text-slate-400 block">Firebase Auth</span>
-                        <span className="text-white font-medium capitalize">{backendStatus.data?.services?.firebaseAuth || 'Configured'}</span>
-                      </div>
-                      <div className="bg-black/30 p-2 rounded-lg border border-white/5">
-                        <span className="text-slate-400 block">Cloud Storage</span>
-                        <span className="text-white font-medium capitalize">
-                          {(backendStatus.data?.services?.supabaseStorage || backendStatus.data?.services?.megaCloud || 'ready').replace(/_/g, ' ')}
-                        </span>
-                      </div>
-                      <div className="bg-black/30 p-2 rounded-lg border border-white/5">
-                        <span className="text-slate-400 block">Realtime</span>
-                        <span className="text-white font-medium capitalize">
-                          {backendStatus.data?.services?.realtime || backendStatus.data?.services?.webrtcSignaling || 'Active'}
-                        </span>
-                      </div>
-                    </div>
-                    {backendStatus.data?.services?.supabaseServiceRole !== 'configured' && (
-                      <p className="text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg px-2.5 py-1.5">
-                        ⚠️ Gateway is reachable, but <code>SUPABASE_SERVICE_ROLE_KEY</code> is missing in the runtime environment. Database writes will fail until configured.
-                      </p>
-                    )}
-                    {backendStatus.data?.services?.supabaseStorage === 'bucket_missing' && (
-                      <p className="text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg px-2.5 py-1.5">
-                        ⚠️ Edge Function is live, but the private <code>gosh-media</code> storage bucket was not found yet. Run <code>database/migrations/002_storage_and_realtime.sql</code> in Supabase SQL Editor.
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-semibold text-rose-300">
-                        {backendStatus.notConfigured ? 'Supabase Gateway Not Configured' : 'Edge Gateway Unreachable'}
-                      </p>
-                      <p className="text-[11px] text-slate-300 mt-0.5">{backendStatus.error}</p>
-                      <p className="text-[10px] text-slate-400 mt-1">
-                        Deploy <code className="text-rose-300">supabase/functions/gosh-api</code> via <code className="text-rose-300">supabase functions deploy gosh-api --no-verify-jwt</code>, or enter a custom backend URL above and click <strong className="text-white">Test &amp; Connect</strong>.
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* =========================================================================
             STORAGE & WEBRTC HARDWARE PERMISSIONS
            ========================================================================= */}
         <div className="glass-panel p-5 rounded-2xl border border-white/5 space-y-4">
           <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-            <HardDrive className="w-4 h-4 text-sky-400" /> Cloud Storage &amp; Hardware
+            <HardDrive className="w-4 h-4 text-sky-400" /> Storage &amp; Hardware
           </h3>
 
           <div className="space-y-3 text-xs">
-            {/* Supabase Storage Allocation */}
+            {/* Encrypted Memory Vault */}
             <div className="p-3.5 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between">
               <div>
-                <h4 className="font-semibold text-white">Supabase Cloud Storage (Memory Vault)</h4>
-                <p className="text-[11px] text-slate-400">Private encrypted media bucket (gosh-media)</p>
+                <h4 className="font-semibold text-white">Encrypted Memory Vault</h4>
+                <p className="text-[11px] text-slate-400">Private encrypted backup for shared moments</p>
               </div>
-              <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-mono ${
-                backendStatus?.ok && (backendStatus?.data?.services?.supabaseStorage === 'ready' || backendStatus?.data?.services?.megaCloud === 'ready')
-                  ? 'bg-emerald-500/20 text-emerald-300'
-                  : 'bg-slate-700/60 text-slate-300'
-              }`}>
-                {backendStatus?.ok
-                  ? (backendStatus.data?.services?.supabaseStorage === 'ready' || backendStatus.data?.services?.megaCloud === 'ready'
-                    ? 'Connected'
-                    : 'Bucket Missing')
-                  : 'Checking'}
+              <span className="text-[10px] px-2.5 py-0.5 rounded-full font-medium bg-emerald-500/20 text-emerald-300">
+                Active
               </span>
             </div>
 
@@ -847,7 +634,7 @@ export default function SettingsPage() {
             <Trash2 className="w-10 h-10 text-rose-500 mx-auto mb-3" />
             <h3 className="text-base font-bold text-white mb-1">Delete GOSH Account?</h3>
             <p className="text-xs text-slate-400 mb-6 leading-relaxed">
-              This will permanently delete your profile, conversations, and shared memories from Supabase Database and Storage. This action cannot be reversed.
+              This will permanently delete your profile, conversations, and shared vault memories. This action cannot be reversed.
             </p>
             <div className="flex gap-3 justify-center">
               <button

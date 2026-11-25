@@ -229,24 +229,18 @@ export default function DashboardLayout() {
           </div>
         </header>
 
-        {/* Supabase / Backend Sync Warning Banner */}
+        {/* Account Sync Banner */}
         {syncError && (
           <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 text-xs text-amber-200 flex flex-wrap items-center justify-between gap-2 z-30">
             <span>
-              ⚠️ Database sync paused: {syncError}
+              Reconnecting your profile session. Some updates may take a moment.
             </span>
             <div className="flex items-center gap-2">
               <button
                 onClick={retryBackendSync}
                 className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-100 font-medium transition"
               >
-                Retry Sync
-              </button>
-              <button
-                onClick={() => navigate('/settings')}
-                className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 font-medium transition"
-              >
-                Connection Settings
+                Retry
               </button>
             </div>
           </div>
@@ -395,7 +389,7 @@ export default function DashboardLayout() {
                       <Heart className="w-4 h-4 fill-pink-400" />
                     </div>
                     <div className="text-left">
-                      <div className="text-xs font-semibold text-white">Memory Vault (Supabase Cloud)</div>
+                      <div className="text-xs font-semibold text-white">Memory Vault</div>
                       <div className="text-[10px] text-slate-400">Private encrypted memory storage</div>
                     </div>
                   </div>

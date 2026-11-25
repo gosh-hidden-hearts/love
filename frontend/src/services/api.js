@@ -120,8 +120,8 @@ async function safeRequest(endpoint, options = {}, defaultData = {}) {
         status: res.status,
         empty: true,
         message: res.status === 405 || res.status === 404
-          ? 'API endpoint not found. Ensure the Supabase Edge Function gosh-api is deployed.'
-          : (res.ok ? 'Operation completed successfully' : `Server responded with status ${res.status}`),
+          ? 'Service temporarily unavailable. Please try again shortly.'
+          : (res.ok ? 'Operation completed successfully' : `Request failed with status ${res.status}`),
         ...defaultData
       };
     }
@@ -151,8 +151,8 @@ async function safeRequest(endpoint, options = {}, defaultData = {}) {
       status: res.status,
       error: `Non-JSON response (${res.status})`,
       message: res.status === 404
-        ? 'Supabase Edge Function gosh-api is not deployed yet or unreachable.'
-        : `Server returned non-JSON response (${res.status})`,
+        ? 'Service temporarily unavailable. Please try again shortly.'
+        : `Unexpected server response (${res.status})`,
       isHtml: contentType.includes('text/html'),
       ...defaultData
     };
@@ -161,7 +161,7 @@ async function safeRequest(endpoint, options = {}, defaultData = {}) {
     return {
       success: false,
       error: netErr.message || 'Network request failed',
-      message: 'Unable to reach Supabase Edge Function. Check internet connection and verify gosh-api is deployed.',
+      message: 'Unable to connect right now. Please check your internet connection and try again.',
       offline: true,
       ...defaultData
     };

@@ -89,7 +89,7 @@ export default function MemoryVaultPage() {
     if (!selectedFile) return;
 
     setUploading(true);
-    setUploadProgress('Encrypting and uploading to Supabase Storage...');
+    setUploadProgress('Encrypting and saving to your vault...');
 
     try {
       const formData = new FormData();
@@ -167,7 +167,7 @@ export default function MemoryVaultPage() {
           <div className="flex items-center gap-2">
             <h1 className="text-xl md:text-2xl font-bold text-white">Memory Vault</h1>
             <span className="text-[10px] bg-rose-500/20 text-rose-300 px-2.5 py-0.5 rounded-full font-semibold border border-rose-500/30">
-              Supabase Cloud Protected
+              Private Encrypted Vault
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">Our shared sanctuary of photos, videos, voice memos, and love letters</p>
@@ -306,7 +306,7 @@ export default function MemoryVaultPage() {
                   {/* Action buttons */}
                   <div className="flex items-center justify-between pt-3 mt-3 border-t border-white/5 text-xs text-slate-400">
                     <span className="text-[10px] text-slate-500">
-                      {(mem.fileSize / (1024 * 1024)).toFixed(1)} MB • Supabase Vault
+                      {(mem.fileSize / (1024 * 1024)).toFixed(1)} MB • Private Vault
                     </span>
 
                     <div className="flex items-center gap-1">
@@ -399,7 +399,7 @@ export default function MemoryVaultPage() {
                 <label className="w-full h-36 rounded-2xl border-2 border-dashed border-white/20 hover:border-rose-500 flex flex-col items-center justify-center cursor-pointer transition">
                   <UploadCloud className="w-8 h-8 text-rose-400 mb-2" />
                   <span className="text-xs text-slate-300">Choose Photo, Video, Audio, or Document</span>
-                  <span className="text-[10px] text-slate-500 mt-1">Stored privately in Supabase Storage</span>
+                  <span className="text-[10px] text-slate-500 mt-1">Encrypted &amp; stored privately in your vault</span>
                   <input type="file" onChange={handleFileChange} className="hidden" required />
                 </label>
               )}
