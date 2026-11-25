@@ -103,7 +103,7 @@ export default function CallsPage() {
   });
 
   return (
-    <div className="flex-1 h-full flex flex-col bg-[#0c0d14] overflow-y-auto p-4 md:p-8 select-none">
+    <div className="flex-1 h-full flex flex-col bg-[#0c0d14] overflow-y-auto overflow-x-hidden p-4 md:p-8 select-none max-w-full min-w-0">
       {/* Header */}
       <div className="flex items-center justify-between mb-6 max-w-4xl mx-auto w-full">
         <div>

@@ -9,6 +9,7 @@ import { Server } from 'socket.io';
 // Config & Services
 import config from './config/env.js';
 import setupRealtimeService from './services/realtimeService.js';
+import megaStorageService from './services/megaStorageService.js';
 
 // Route Handlers
 import authRoutes from './routes/authRoutes.js';
@@ -19,6 +20,7 @@ import statusRoutes from './routes/statusRoutes.js';
 import memoryVaultRoutes from './routes/memoryVaultRoutes.js';
 import callRoutes from './routes/callRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
+import fileRoutes from './routes/fileRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -52,7 +54,21 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use('/uploads', express.static(uploadsDir));
 
 // Health Check
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
+  let megaCloudStatus = 'ready';
+  let megaDetails = null;
+  try {
+    const status = await megaStorageService.getStatus();
+    megaCloudStatus = status.connected ? 'ready' : 'disconnected';
+    megaDetails = {
+      connected: status.connected,
+      email: status.email || null,
+      rootFolderId: status.rootNodeId || 'pmRVmLJC'
+    };
+  } catch (e) {
+    megaCloudStatus = 'disconnected';
+  }
+
   res.json({
     status: 'online',
     app: 'GOSH (Glimpse Of Soul Hearts)',
@@ -61,9 +77,10 @@ app.get('/api/health', (req, res) => {
     services: {
       supabase: 'connected',
       googleSmtp: 'ready',
-      megaCloud: 'ready',
+      megaCloud: megaCloudStatus,
       webrtcSignaling: 'active'
-    }
+    },
+    mega: megaDetails
   });
 });
 
@@ -76,6 +93,7 @@ app.use('/api/statuses', statusRoutes);
 app.use('/api/memory-vault', memoryVaultRoutes);
 app.use('/api/calls', callRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/files', fileRoutes);
 
 // In production, serve frontend build dist
 const frontendDist = path.join(__dirname, '../../frontend/dist');

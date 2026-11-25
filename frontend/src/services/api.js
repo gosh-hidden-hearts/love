@@ -40,6 +40,20 @@ export const getCustomBackendUrl = () => {
   return typeof localStorage !== 'undefined' ? localStorage.getItem('gosh_backend_url') || '' : '';
 };
 
+// Resolves a relative or stream file URL to a fully-qualified backend URL in production (e.g. for GitHub Pages)
+export const resolveFileUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
+    return url;
+  }
+  const apiBase = getApiBase();
+  if (apiBase === '/api') {
+    return url;
+  }
+  const origin = apiBase.replace(/\/api\/?$/, '');
+  return `${origin}${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
 export const API_BASE = getApiBase();
 
 function getAuthHeaders(extra = {}) {
@@ -142,12 +156,12 @@ export const api = {
     });
   },
 
-  // Check username & mobile uniqueness
-  async checkAvailability(username, mobile) {
+  // Check username, mobile & email uniqueness
+  async checkAvailability(username, mobile, email = null) {
     return safeRequest('/auth/check-availability', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, mobile })
+      body: JSON.stringify({ username, mobile, email })
     });
   },
 
@@ -474,7 +488,9 @@ export const api = {
       { headers: getAuthHeaders() },
       { publicKey: null }
     );
-  }
+  },
+
+  resolveFileUrl
 };
 
 export default api;

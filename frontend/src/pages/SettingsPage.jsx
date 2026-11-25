@@ -34,6 +34,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { TermsModal, PrivacyModal } from '../components/TermsModal';
 import api, { getCustomBackendUrl, setCustomBackendUrl, getApiBase } from '../services/api';
 import socketService from '../services/socket';
+import logoImg from '../assets/logo.png';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
@@ -230,7 +231,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="flex-1 h-full flex flex-col bg-[#08090e] overflow-y-auto p-4 md:p-8 select-none">
+    <div className="flex-1 h-full flex flex-col bg-[#08090e] overflow-y-auto overflow-x-hidden p-4 md:p-8 select-none max-w-full min-w-0">
       {/* Header */}
       <div className="mb-6 max-w-3xl mx-auto w-full">
         <h1 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2">
@@ -283,8 +284,8 @@ export default function SettingsPage() {
           
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-500 to-pink-600 flex items-center justify-center text-white shadow-lg shadow-rose-500/30 flex-shrink-0">
-                <Smartphone className="w-5 h-5" />
+              <div className="w-12 h-12 rounded-2xl overflow-hidden border border-rose-500/40 shadow-glow-pink flex-shrink-0 bg-[#0c0d18]">
+                <img src={logoImg} alt="GOSH App Icon" className="w-full h-full object-cover" />
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-white">GOSH Android App (PWA)</h3>
@@ -744,6 +745,18 @@ export default function SettingsPage() {
           >
             {savingSettings ? 'Saving Preferences...' : 'Save All Preferences'}
           </button>
+        </div>
+
+        {/* App Version & Branding */}
+        <div className="flex flex-col items-center justify-center p-6 text-center text-slate-500 space-y-2">
+          <div className="w-16 h-16 rounded-2xl overflow-hidden border border-rose-500/30 shadow-glow-pink bg-[#0c0d18] hover:scale-105 transition duration-300">
+            <img src={logoImg} alt="GOSH Logo" className="w-full h-full object-cover" />
+          </div>
+          <h4 className="text-sm font-bold text-white tracking-wide">GOSH — Hidden Hearts</h4>
+          <p className="text-[11px] text-rose-300/80 font-mono">Version 1.0.0 (PWA) • Romantic Sanctuary</p>
+          <p className="text-[10px] text-slate-400 max-w-xs">
+            End-to-End Encrypted Private Communication, Memory Vault & Real-Time Connection
+          </p>
         </div>
 
         <div className="glass-panel p-5 rounded-2xl border border-rose-500/20 space-y-3">

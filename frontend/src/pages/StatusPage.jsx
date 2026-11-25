@@ -249,7 +249,7 @@ export default function StatusPage() {
   };
 
   return (
-    <div className="flex-1 h-full flex flex-col bg-[#0c0d14] overflow-y-auto p-4 md:p-8 select-none">
+    <div className="flex-1 h-full flex flex-col bg-[#0c0d14] overflow-y-auto overflow-x-hidden p-4 md:p-8 select-none max-w-full min-w-0">
       {/* Header */}
       <div className="flex items-center justify-between mb-6 max-w-4xl mx-auto w-full">
         <div>
@@ -479,14 +479,14 @@ export default function StatusPage() {
                   e.preventDefault();
                   handleSendStatusReply();
                 }}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 w-full min-w-0"
               >
                 <input
                   type="text"
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
                   placeholder="Send a romantic reply to chat..."
-                  className="flex-1 py-3 px-4 rounded-full glass-input text-xs text-white placeholder-slate-400 focus:outline-none"
+                  className="flex-1 min-w-0 py-3 px-4 rounded-full glass-input text-xs text-white placeholder-slate-400 focus:outline-none"
                 />
                 <button 
                   type="submit"

@@ -4,7 +4,8 @@ import megaStorageService from '../services/megaStorageService.js';
 export const memoryVaultController = {
   async getMemories(req, res) {
     try {
-      const memories = await db.getMemories();
+      const { userId } = req.query;
+      const memories = await db.getMemories(userId);
       return res.json({ success: true, memories });
     } catch (err) {
       return res.status(500).json({ success: false, message: err.message });
@@ -23,12 +24,13 @@ export const memoryVaultController = {
       // Stream file directly to MEGA Cloud Storage
       let megaResult = null;
       try {
-        megaResult = await megaStorageService.uploadFile(file.buffer, file.originalname, file.mimetype);
+        megaResult = await megaStorageService.uploadFile(file.buffer, file.originalname, file.mimetype, 'GOSH_Memories');
       } catch (megaErr) {
         console.warn('Direct MEGA stream error, falling back to local proxy:', megaErr.message);
         megaResult = {
           nodeId: 'local-' + Date.now(),
-          downloadUrl: `data:${file.mimetype};base64,${file.buffer.toString('base64')}`
+          downloadUrl: `data:${file.mimetype};base64,${file.buffer.toString('base64')}`,
+          publicUrl: '#'
         };
       }
 
@@ -39,7 +41,8 @@ export const memoryVaultController = {
         fileSize: file.size,
         mimeType: file.mimetype,
         megaFileHandle: megaResult.nodeId,
-        megaDownloadUrl: megaResult.downloadUrl,
+        megaDownloadUrl: megaResult.streamUrl || megaResult.downloadUrl,
+        megaPublicUrl: megaResult.publicUrl || megaResult.downloadUrl,
         caption,
         memoryDate: memoryDate || new Date().toISOString().split('T')[0],
         feelingsTag,
@@ -61,6 +64,10 @@ export const memoryVaultController = {
   async deleteMemory(req, res) {
     try {
       const { memoryId } = req.params;
+      const mem = await db.getMemoryById(memoryId);
+      if (mem?.megaFileHandle && typeof mem.megaFileHandle === 'string' && !mem.megaFileHandle.startsWith('local-')) {
+        megaStorageService.deleteFile(mem.megaFileHandle).catch(console.warn);
+      }
       await db.deleteMemory(memoryId);
       return res.json({ success: true });
     } catch (err) {

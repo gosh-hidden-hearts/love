@@ -123,7 +123,7 @@ export default function AccountsPage() {
   };
 
   return (
-    <div className="flex-1 h-full flex flex-col bg-[#08090e] overflow-y-auto p-4 md:p-8 select-none">
+    <div className="flex-1 h-full flex flex-col bg-[#08090e] overflow-y-auto overflow-x-hidden p-4 md:p-8 select-none max-w-full min-w-0">
       {/* Header */}
       <div className="mb-6 max-w-3xl mx-auto w-full">
         <h1 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2">

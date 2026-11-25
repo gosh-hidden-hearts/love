@@ -113,3 +113,32 @@ test('8. Call logging and history retrieval works', async () => {
   assert.strictEqual(histData.success, true);
   assert.ok(histData.calls.length > 0);
 });
+
+test('9. MEGA file storage status endpoint responds', async () => {
+  const res = await fetch(`${BASE_URL}/files/status`);
+  assert.strictEqual(res.status, 200);
+  const data = await res.json();
+  assert.strictEqual(data.success, true);
+  assert.strictEqual(data.connected, true);
+  assert.strictEqual(data.rootNodeId, 'pmRVmLJC');
+});
+
+test('10. Attachment upload streams directly to MEGA Cloud Storage', async () => {
+  const formData = new FormData();
+  const fileBlob = new Blob(['Test Attachment from GOSH Unit Test 💌'], { type: 'text/plain' });
+  formData.append('file', fileBlob, 'test_attachment.txt');
+
+  const res = await fetch(`${BASE_URL}/messages/upload`, {
+    method: 'POST',
+    body: formData
+  });
+
+  assert.strictEqual(res.status, 200);
+  const data = await res.json();
+  assert.strictEqual(data.success, true);
+  assert.ok(data.fileUrl);
+  assert.ok(data.fileUrl.startsWith('/api/files/stream/'));
+  assert.ok(data.megaFileHandle);
+  assert.strictEqual(data.messageType, 'file');
+  console.log('Uploaded attachment to MEGA successfully! Stream URL:', data.fileUrl, 'Node ID:', data.megaFileHandle);
+});

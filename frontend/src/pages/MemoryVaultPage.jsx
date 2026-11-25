@@ -17,7 +17,8 @@ import {
   FileText, 
   Lock,
   Search,
-  Filter
+  Filter,
+  ExternalLink
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
@@ -212,7 +213,7 @@ export default function MemoryVaultPage() {
   });
 
   return (
-    <div className="flex-1 h-full flex flex-col bg-[#0c0d14] overflow-y-auto p-4 md:p-8 select-none">
+    <div className="flex-1 h-full flex flex-col bg-[#0c0d14] overflow-y-auto overflow-x-hidden p-4 md:p-8 select-none max-w-full min-w-0">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 max-w-6xl mx-auto w-full">
         <div>
@@ -234,14 +235,14 @@ export default function MemoryVaultPage() {
         </button>
       </div>
 
-      <div className="max-w-6xl mx-auto w-full space-y-6">
+      <div className="max-w-6xl mx-auto w-full space-y-6 min-w-0">
         {/* Album Selector Chips */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none w-full max-w-full min-w-0">
           {albums.map((album) => (
             <button
               key={album}
               onClick={() => setSelectedAlbum(album)}
-              className={`px-4 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition flex items-center gap-2 ${
+              className={`px-4 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition flex items-center gap-2 shrink-0 ${
                 selectedAlbum === album
                   ? 'bg-rose-500 text-white shadow-glow-pink'
                   : 'bg-white/5 hover:bg-white/10 text-slate-400'
@@ -253,7 +254,7 @@ export default function MemoryVaultPage() {
           ))}
           <button
             onClick={() => setShowAddAlbumModal(true)}
-            className="px-3.5 py-2 rounded-xl text-xs font-medium whitespace-nowrap bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 flex items-center gap-1.5 transition"
+            className="px-3.5 py-2 rounded-xl text-xs font-medium whitespace-nowrap bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 flex items-center gap-1.5 transition shrink-0"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>New Album</span>
@@ -261,9 +262,9 @@ export default function MemoryVaultPage() {
         </div>
 
         {/* Media Type Filter & Search Bar */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 w-full min-w-0">
           {/* Media Types */}
-          <div className="flex gap-1.5 p-1 bg-white/5 rounded-xl self-start sm:self-auto">
+          <div className="flex gap-1.5 p-1 bg-white/5 rounded-xl self-start sm:self-auto max-w-full overflow-x-auto scrollbar-none w-full sm:w-auto min-w-0">
             {[
               { id: 'all', label: 'All', icon: Sparkles },
               { id: 'photo', label: 'Photos', icon: ImageIcon },
@@ -276,7 +277,7 @@ export default function MemoryVaultPage() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTabFilter(tab.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap flex items-center gap-1.5 transition shrink-0 ${
                     activeTabFilter === tab.id ? 'bg-white/15 text-white' : 'text-slate-400 hover:text-white'
                   }`}
                 >
@@ -288,7 +289,7 @@ export default function MemoryVaultPage() {
           </div>
 
           {/* Search */}
-          <div className="relative w-full sm:w-64">
+          <div className="relative w-full sm:w-64 min-w-0">
             <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -312,17 +313,18 @@ export default function MemoryVaultPage() {
                 <div className="relative h-48 bg-black/40 overflow-hidden flex items-center justify-center">
                   {mem.fileType === 'photo' ? (
                     <img
-                      src={mem.megaDownloadUrl}
+                      src={api.resolveFileUrl(mem.megaDownloadUrl)}
                       alt={mem.caption}
                       onClick={() => setActiveLightboxMemory(mem)}
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-500 cursor-pointer"
+                      loading="lazy"
                     />
                   ) : mem.fileType === 'video' ? (
-                    <video src={mem.megaDownloadUrl} controls className="w-full h-full object-cover" />
+                    <video src={api.resolveFileUrl(mem.megaDownloadUrl)} controls className="w-full h-full object-cover" />
                   ) : mem.fileType === 'audio' ? (
                     <div className="text-center p-4">
                       <Mic className="w-10 h-10 text-rose-400 mx-auto mb-2 animate-pulse" />
-                      <audio src={mem.megaDownloadUrl} controls className="h-8 max-w-[180px]" />
+                      <audio src={api.resolveFileUrl(mem.megaDownloadUrl)} controls className="h-8 max-w-[180px]" />
                     </div>
                   ) : (
                     <div className="text-center p-4">
@@ -362,7 +364,7 @@ export default function MemoryVaultPage() {
 
                     <div className="flex items-center gap-1">
                       <a
-                        href={mem.megaDownloadUrl}
+                        href={api.resolveFileUrl(mem.megaDownloadUrl)}
                         download={mem.fileName}
                         target="_blank"
                         rel="noreferrer"
@@ -371,6 +373,17 @@ export default function MemoryVaultPage() {
                       >
                         <Download className="w-3.5 h-3.5" />
                       </a>
+                      {mem.megaPublicUrl && mem.megaPublicUrl !== '#' && (
+                        <a
+                          href={mem.megaPublicUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-1.5 rounded-lg hover:bg-purple-500/20 text-slate-400 hover:text-purple-300 transition"
+                          title="Open on MEGA"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      )}
                       <button
                         onClick={() => handleDeleteMemory(mem.id)}
                         className="p-1.5 rounded-lg hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition"
@@ -563,7 +576,7 @@ export default function MemoryVaultPage() {
           className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4 backdrop-blur-md cursor-pointer animate-fadeIn"
         >
           <img
-            src={activeLightboxMemory.megaDownloadUrl}
+            src={api.resolveFileUrl(activeLightboxMemory.megaDownloadUrl)}
             alt={activeLightboxMemory.caption}
             className="max-w-full max-h-[80vh] rounded-2xl object-contain shadow-2xl mb-3"
           />

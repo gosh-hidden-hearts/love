@@ -6,7 +6,7 @@ import { TermsModal, PrivacyModal } from '../components/TermsModal';
 
 export default function AgreeContinuePage() {
   const navigate = useNavigate();
-  const { acceptTerms } = useAuth();
+  const { user, acceptTerms } = useAuth();
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState('English');
@@ -16,20 +16,30 @@ export default function AgreeContinuePage() {
     setIsAccepting(true);
     try {
       await acceptTerms();
-      navigate('/login');
+      if (user) {
+        navigate('/chats', { replace: true });
+      } else {
+        navigate('/login', { replace: true });
+      }
     } catch (err) {
       console.error(err);
-      navigate('/login');
+      if (user) {
+        navigate('/chats', { replace: true });
+      } else {
+        navigate('/login', { replace: true });
+      }
     } finally {
       setIsAccepting(false);
     }
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#0c0d14] flex flex-col justify-between items-center px-6 py-10 relative overflow-hidden text-slate-100 select-none">
-      {/* Background glow effects */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-gradient-to-tr from-purple-900/20 via-rose-600/15 to-transparent rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-10 right-10 w-72 h-72 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-screen min-h-[100dvh] w-full max-w-full bg-[#0c0d14] flex flex-col justify-between items-center px-4 sm:px-6 py-6 sm:py-8 relative overflow-x-hidden text-slate-100 select-none">
+      {/* Background glow effects strictly constrained to prevent horizontal scroll */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 sm:w-[500px] h-96 sm:h-[500px] bg-gradient-to-tr from-purple-900/20 via-rose-600/15 to-transparent rounded-full blur-3xl" />
+        <div className="absolute bottom-10 right-10 w-72 h-72 bg-emerald-600/10 rounded-full blur-3xl" />
+      </div>
 
       {/* Top Header / Brand Title */}
       <div className="w-full text-center z-10 pt-4">

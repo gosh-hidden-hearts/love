@@ -19,5 +19,6 @@ const router = Router();
 router.get('/', statusController.getStatuses);
 router.post('/', upload.single('media'), statusController.createStatus);
 router.post('/:statusId/view', statusController.markViewed);
+router.delete('/:statusId', statusController.deleteStatus);
 
 export default router;

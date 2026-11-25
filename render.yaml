@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: gosh-backend
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: SUPABASE_URL
+        value: https://azwclorwxrzgofmribms.supabase.co
+      - key: SUPABASE_KEY
+        value: sb_publishable_TzJoKCD-cPN6JLbgB_5K5g_H2nkq8YW
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        value: gosh81416@gmail.com
+      - key: SMTP_PASS
+        sync: false # Set in Render Dashboard: your-gmail-app-password
+      - key: SMTP_FROM
+        value: '"GOSH Sanctuary" <gosh81416@gmail.com>'
+      - key: MEGA_EMAIL
+        value: gosh81416@gmail.com
+      - key: MEGA_PASSWORD
+        sync: false # Set in Render Dashboard: your-mega-password
+      - key: JWT_SECRET
+        generateValue: true
+      - key: OTP_EXPIRY_MINUTES
+        value: "10"

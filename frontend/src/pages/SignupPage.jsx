@@ -1,13 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Lock, Mail, User, Phone, Heart, Sparkles, AlertCircle, CheckCircle2, ArrowRight, ShieldCheck } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useAuth } from '../contexts/AuthContext';
+import { auth, fetchSignInMethodsForEmail } from '../services/firebase';
 import api from '../services/api';
+import logoImg from '../assets/logo.png';
 
 export default function SignupPage() {
   const navigate = useNavigate();
-  const { signup, loginWithGoogle, loginWithGoogleRedirect } = useAuth();
+  const { user, signup, loginWithGoogle, loginWithGoogleRedirect } = useAuth();
+
+  // If already authenticated or becomes authenticated, redirect to /chats immediately
+  useEffect(() => {
+    if (user) {
+      navigate('/chats', { replace: true });
+    }
+  }, [user, navigate]);
 
   // Form states
   const [email, setEmail] = useState('');
@@ -26,6 +35,7 @@ export default function SignupPage() {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [existingAccountEmail, setExistingAccountEmail] = useState('');
 
   // Password strength calculation
   const getPasswordStrength = (pass) => {
@@ -49,9 +59,14 @@ export default function SignupPage() {
   const handleInitiateSignup = async (e) => {
     e.preventDefault();
     setError('');
+    setExistingAccountEmail('');
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanUsername = username.trim();
+    const cleanMobile = mobile.trim();
 
     // Validations
-    if (!email.trim() || !displayName.trim() || !password) {
+    if (!cleanEmail || !displayName.trim() || !password) {
       setError('Please fill in all mandatory fields.');
       return;
     }
@@ -68,26 +83,58 @@ export default function SignupPage() {
 
     setLoading(true);
     try {
-      // 1. Check username / mobile availability
-      if (username || mobile) {
-        const availCheck = await api.checkAvailability(username.trim(), mobile.trim());
-        if (!availCheck.available) {
-          throw new Error(availCheck.message || 'Username or mobile number is already taken.');
+      // 1. Check availability with backend (email, username, mobile)
+      const availCheck = await api.checkAvailability(cleanUsername, cleanMobile, cleanEmail);
+      if (!availCheck.available) {
+        if (availCheck.field === 'email' || availCheck.code === 'EMAIL_ALREADY_IN_USE') {
+          setExistingAccountEmail(cleanEmail);
+          setError(availCheck.message || 'An account with this email address already exists. Please sign in or reset your password.');
+          return;
         }
+        setError(availCheck.message || 'Username or mobile number is already taken.');
+        return;
       }
 
-      // 2. Send Google SMTP OTP
-      const otpRes = await api.sendOTP(email.trim(), 'signup');
+      // 2. Pre-check Firebase Auth for existing email
+      try {
+        const methods = await fetchSignInMethodsForEmail(auth, cleanEmail);
+        if (methods && methods.length > 0) {
+          setExistingAccountEmail(cleanEmail);
+          setError('An account with this email address already exists in Firebase. Please sign in or reset your password.');
+          return;
+        }
+      } catch (fbErr) {
+        if (fbErr.code === 'auth/email-already-in-use') {
+          setExistingAccountEmail(cleanEmail);
+          setError('An account with this email address already exists. Please sign in or reset your password.');
+          return;
+        }
+        // If network / enumeration restricted, continue to secure OTP dispatch
+      }
+
+      // 3. Send Google SMTP OTP
+      const otpRes = await api.sendOTP(cleanEmail, 'signup');
       if (otpRes.success) {
         setCurrentStep(2);
-        setSuccessMsg(`A 6-digit verification code has been dispatched to ${email.trim()} via Google SMTP.`);
+        setSuccessMsg(`A 6-digit verification code has been dispatched to ${cleanEmail} via Google SMTP.`);
         startResendTimer();
       } else {
+        if (otpRes.code === 'EMAIL_ALREADY_IN_USE' || (otpRes.message && otpRes.message.includes('already exists'))) {
+          setExistingAccountEmail(cleanEmail);
+          setError(otpRes.message || 'An account with this email already exists.');
+          return;
+        }
         throw new Error(otpRes.message || 'Failed to dispatch verification OTP.');
       }
     } catch (err) {
       console.error('Signup error:', err);
-      setError(err.message || 'An error occurred while creating your account.');
+      const errMsg = err.message || '';
+      if (errMsg.includes('already exists') || errMsg.includes('already in use')) {
+        setExistingAccountEmail(cleanEmail);
+        setError('An account with this email address already exists. Please sign in or recover your password.');
+      } else {
+        setError(errMsg || 'An error occurred while creating your account.');
+      }
     } finally {
       setLoading(false);
     }
@@ -97,6 +144,7 @@ export default function SignupPage() {
   const handleVerifyOtpAndCreate = async (e) => {
     e.preventDefault();
     setError('');
+    const cleanEmail = email.trim().toLowerCase();
 
     if (otp.trim().length !== 6) {
       setError('Please enter the complete 6-digit OTP.');
@@ -106,17 +154,17 @@ export default function SignupPage() {
     setLoading(true);
     try {
       // 1. Verify OTP with backend
-      const verifyRes = await api.verifyOTP(email.trim(), otp.trim(), 'signup');
+      const verifyRes = await api.verifyOTP(cleanEmail, otp.trim(), 'signup');
       if (!verifyRes.success) {
         throw new Error(verifyRes.message || 'Invalid or expired OTP code.');
       }
 
       // 2. Create Firebase account & sync with Supabase
       await signup({
-        email: email.trim(),
+        email: cleanEmail,
         password,
         displayName: displayName.trim(),
-        username: username.trim() || email.trim().split('@')[0],
+        username: username.trim() || cleanEmail.split('@')[0],
         mobile: mobile.trim() || null
       });
 
@@ -128,11 +176,17 @@ export default function SignupPage() {
         colors: ['#f43f5e', '#ec4899', '#c084fc', '#25d366']
       });
 
-      // 4. Navigate to dashboard
-      navigate('/');
+      // 4. Navigate to dashboard / chats
+      navigate('/chats', { replace: true });
     } catch (err) {
       console.error('OTP verification error:', err);
-      setError(err.message || 'Verification failed. Please check the code.');
+      const errMsg = err.message || '';
+      if (err.code === 'auth/email-already-in-use' || errMsg.includes('auth/email-already-in-use') || errMsg.includes('already in use')) {
+        setExistingAccountEmail(cleanEmail);
+        setError('An account with this email address already exists in Firebase. Please sign in to your existing account or recover your password.');
+      } else {
+        setError(errMsg || 'Verification failed. Please check the code.');
+      }
     } finally {
       setLoading(false);
     }
@@ -179,10 +233,10 @@ export default function SignupPage() {
         await loginWithGoogleRedirect();
         return;
       }
-      const user = await loginWithGoogle();
-      if (user) {
+      const loggedUser = await loginWithGoogle();
+      if (loggedUser) {
         confetti({ particleCount: 70, spread: 60, colors: ['#f43f5e', '#c084fc'] });
-        navigate('/');
+        navigate('/chats', { replace: true });
       }
     } catch (err) {
       console.warn('Google signup notice:', err.code, err.message);
@@ -201,17 +255,19 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#0c0d14] flex flex-col justify-center items-center px-4 py-8 relative overflow-hidden text-slate-100 select-none">
-      {/* Background glow effects */}
-      <div className="absolute top-10 right-1/4 w-80 h-80 bg-rose-600/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-10 left-1/4 w-96 h-96 bg-purple-900/15 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-screen min-h-[100dvh] w-full max-w-full bg-[#0c0d14] flex flex-col justify-center items-center px-4 sm:px-6 py-6 sm:py-8 relative overflow-x-hidden text-slate-100 select-none">
+      {/* Background glow effects strictly contained to prevent horizontal scroll */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-10 right-1/4 w-80 h-80 bg-rose-600/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-10 left-1/4 w-96 h-96 bg-purple-900/15 rounded-full blur-3xl" />
+      </div>
 
       {/* Main Container Card */}
-      <div className="w-full max-w-lg glass-panel p-8 rounded-3xl shadow-2xl border border-white/10 relative z-10">
+      <div className="w-full max-w-lg glass-panel p-5 sm:p-8 rounded-3xl shadow-2xl border border-white/10 relative z-10 m-auto">
         {/* Header */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-tr from-rose-500/20 to-purple-600/30 border border-rose-500/30 shadow-glow-pink mb-2">
-            <Heart className="w-6 h-6 text-rose-500 fill-rose-500" />
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl overflow-hidden border border-rose-500/40 shadow-glow-pink mb-2 bg-[#0c0d18] hover:scale-105 transition duration-300">
+            <img src={logoImg} alt="GOSH Logo" className="w-full h-full object-cover" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white flex items-center justify-center gap-1.5">
             Join GOSH <Sparkles className="w-4 h-4 text-rose-400" />
@@ -244,6 +300,51 @@ export default function SignupPage() {
           <div className="mb-5 p-3.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2.5">
             <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-400" />
             <span>{successMsg}</span>
+          </div>
+        )}
+
+        {/* Existing Account Recovery / Login Action Prompt */}
+        {existingAccountEmail && (
+          <div className="mb-5 p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 backdrop-blur-md animate-fade-in">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-rose-500/20 border border-rose-500/40 flex items-center justify-center flex-shrink-0 text-rose-300">
+                <User className="w-4 h-4" />
+              </div>
+              <div className="flex-1">
+                <h4 className="text-xs font-semibold text-rose-200">Existing Account Detected</h4>
+                <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                  An account is already registered for <span className="text-white font-medium">{existingAccountEmail}</span>. Would you like to sign in or recover your password?
+                </p>
+                <div className="flex flex-wrap items-center gap-2 mt-3">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/login', { state: { email: existingAccountEmail } })}
+                    className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white text-xs font-medium shadow-md shadow-rose-900/40 transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>Sign In</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/login', { state: { email: existingAccountEmail, openForgot: true } })}
+                    className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-rose-300 border border-rose-500/30 text-xs font-medium transition-all cursor-pointer"
+                  >
+                    Forgot Password?
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setExistingAccountEmail('');
+                      setError('');
+                      setCurrentStep(1);
+                    }}
+                    className="px-2.5 py-1.5 text-[11px] text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                  >
+                    Use Different Email
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

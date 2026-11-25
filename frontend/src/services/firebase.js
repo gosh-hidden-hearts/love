@@ -10,7 +10,8 @@ import {
   signOut, 
   sendPasswordResetEmail,
   updateProfile,
-  onAuthStateChanged
+  onAuthStateChanged,
+  fetchSignInMethodsForEmail
 } from 'firebase/auth';
 
 const firebaseConfig = {
@@ -42,7 +43,8 @@ export {
   signOut, 
   sendPasswordResetEmail,
   updateProfile,
-  onAuthStateChanged
+  onAuthStateChanged,
+  fetchSignInMethodsForEmail
 };
 
 export default app;

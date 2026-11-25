@@ -10,7 +10,8 @@
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
     "build:frontend": "cd frontend && npm run build",
-    "test:backend": "cd backend && npm run test"
+    "test:backend": "cd backend && npm run test",
+    "verify:supabase": "node backend/src/scripts/verifySupabase.js"
   },
   "keywords": [
     "gosh",

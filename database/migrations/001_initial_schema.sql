@@ -134,6 +134,12 @@ CREATE TABLE IF NOT EXISTS messages (
     reply_to_id UUID REFERENCES messages(id) ON DELETE SET NULL,
     message_type VARCHAR(30) DEFAULT 'text', -- 'text', 'image', 'video', 'audio', 'file'
     content TEXT,
+    media_url TEXT,
+    audio_url TEXT,
+    file_name VARCHAR(255),
+    file_size BIGINT,
+    mega_file_handle VARCHAR(100),
+    mega_download_url TEXT,
     is_edited BOOLEAN DEFAULT FALSE,
     is_deleted_for_all BOOLEAN DEFAULT FALSE,
     delivery_status VARCHAR(20) DEFAULT 'sent', -- 'sending', 'sent', 'delivered', 'read'
@@ -348,6 +354,14 @@ CREATE TABLE IF NOT EXISTS terms_acceptance (
     accepted_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 29. END-TO-END ENCRYPTION KEYS (Public key exchange)
+CREATE TABLE IF NOT EXISTS encryption_keys (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    public_key JSONB NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- INDEXES FOR MAXIMUM QUERY EFFICIENCY
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
@@ -357,3 +371,4 @@ CREATE INDEX IF NOT EXISTS idx_statuses_expires ON statuses(expires_at);
 CREATE INDEX IF NOT EXISTS idx_memory_space_id ON memory_files(space_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_calls_users ON calls(caller_id, receiver_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_read, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_encryption_keys_user ON encryption_keys(user_id);

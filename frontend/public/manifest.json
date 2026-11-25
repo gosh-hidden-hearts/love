@@ -1,10 +1,10 @@
 {
   "name": "GOSH",
   "short_name": "GOSH",
-  "id": "/love/",
+  "id": "gosh-pwa",
   "description": "WhatsApp-Inspired Romantic Social Networking & Instant Communication Sanctuary",
-  "start_url": "/love/",
-  "scope": "/love/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#08090e",
@@ -16,25 +16,25 @@
   ],
   "icons": [
     {
-      "src": "/love/icons/icon-192.png",
+      "src": "icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/love/icons/icon-192-maskable.png",
+      "src": "icons/icon-192-maskable.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "/love/icons/icon-512.png",
+      "src": "icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/love/icons/icon-512-maskable.png",
+      "src": "icons/icon-512-maskable.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

@@ -21,21 +21,21 @@ const ProtectedRoute = ({ children }) => {
 
   if (loading) {
     return (
-      <div className="h-screen w-screen bg-[#0c0d14] flex flex-col items-center justify-center text-slate-400">
+      <div className="h-screen h-[100dvh] w-full max-w-full bg-[#0c0d14] flex flex-col items-center justify-center text-slate-400">
         <div className="w-12 h-12 border-3 border-rose-500/30 border-t-rose-500 rounded-full animate-spin mb-4" />
         <p className="text-xs tracking-wider uppercase text-rose-300 font-medium">Entering GOSH Sanctuary...</p>
       </div>
     );
   }
 
-  // First time user must agree to terms
-  if (!termsAccepted) {
-    return <Navigate to="/agree" replace />;
-  }
-
-  // If not logged in, go to login
+  // If not logged in, redirect to login
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // If authenticated user hasn't explicitly set flag, auto-mark terms accepted
+  if (!termsAccepted) {
+    localStorage.setItem('gosh_terms_accepted', 'true');
   }
 
   return children;
@@ -43,18 +43,18 @@ const ProtectedRoute = ({ children }) => {
 
 // Public Route Guard (prevents logged in users from seeing login/agree)
 const PublicRoute = ({ children }) => {
-  const { user, loading, termsAccepted } = useAuth();
+  const { user, loading } = useAuth();
 
   if (loading) {
     return (
-      <div className="h-screen w-screen bg-[#0c0d14] flex items-center justify-center">
+      <div className="h-screen h-[100dvh] w-full max-w-full bg-[#0c0d14] flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-rose-500/30 border-t-rose-500 rounded-full animate-spin" />
       </div>
     );
   }
 
-  // If already logged in, redirect to main chats
-  if (user && termsAccepted) {
+  // If already logged in, redirect directly to main chats
+  if (user) {
     return <Navigate to="/chats" replace />;
   }
 
@@ -63,7 +63,13 @@ const PublicRoute = ({ children }) => {
 
 export default function App() {
   return (
-    <BrowserRouter basename={import.meta.env.BASE_URL}>
+    <BrowserRouter
+      basename={import.meta.env.BASE_URL}
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true
+      }}
+    >
       <AuthProvider>
         <CallProvider>
           <Routes>
@@ -111,7 +117,11 @@ export default function App() {
               <Route path="vault" element={<MemoryVaultPage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="accounts" element={<AccountsPage />} />
+              <Route path="dashboard" element={<Navigate to="/chats" replace />} />
             </Route>
+
+            {/* Direct Dashboard route alias */}
+            <Route path="/dashboard" element={<Navigate to="/chats" replace />} />
 
             {/* Catch All */}
             <Route path="*" element={<Navigate to="/chats" replace />} />

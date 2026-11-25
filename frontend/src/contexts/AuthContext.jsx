@@ -18,6 +18,30 @@ import encryptionService from '../services/encryptionService';
 
 const AuthContext = createContext(null);
 
+export const buildUserObject = (firebaseUser, backendUser = null, backendProfile = null) => {
+  const uid = firebaseUser?.uid || backendUser?.firebase_uid || backendUser?.id || '';
+  const email = firebaseUser?.email || backendUser?.email || '';
+  const fallbackName = email ? email.split('@')[0] : 'Soul Partner';
+  const displayName = backendProfile?.display_name || firebaseUser?.displayName || backendUser?.username || fallbackName;
+  const username = backendUser?.username || firebaseUser?.displayName?.toLowerCase().replace(/\s+/g, '_') || fallbackName.toLowerCase().replace(/\s+/g, '_');
+  const mobile = backendUser?.mobile_number || '';
+  const avatarUrl = backendProfile?.avatar_url || firebaseUser?.photoURL || `https://api.dicebear.com/7.x/adventurer/svg?seed=${uid || 'GOSH'}`;
+  const bio = backendProfile?.bio || 'In a love story written by the stars ✨';
+  const relationshipStatus = backendProfile?.relationship_status || 'In a soul bond';
+
+  return {
+    id: backendUser?.id || uid,
+    uid,
+    email,
+    displayName,
+    username,
+    mobile,
+    avatarUrl,
+    bio,
+    relationshipStatus
+  };
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     try {
@@ -56,17 +80,11 @@ export const AuthProvider = ({ children }) => {
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        let userObj = {
-          id: firebaseUser.uid,
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Soul Partner',
-          username: firebaseUser.displayName?.toLowerCase().replace(/\s+/g, '_') || firebaseUser.email?.split('@')[0] || 'soul_partner',
-          mobile: '',
-          avatarUrl: firebaseUser.photoURL || `https://api.dicebear.com/7.x/adventurer/svg?seed=${firebaseUser.uid}`,
-          bio: 'In a love story written by the stars ✨',
-          relationshipStatus: 'In a soul bond'
-        };
+        let userObj = buildUserObject(firebaseUser);
+
+        // Mark terms accepted for authenticated users
+        localStorage.setItem('gosh_terms_accepted', 'true');
+        setTermsAccepted(true);
 
         try {
           // Sync with backend / Supabase if backend service is available
@@ -78,19 +96,10 @@ export const AuthProvider = ({ children }) => {
           });
 
           if (syncRes && syncRes.user) {
-            userObj = {
-              ...userObj,
-              id: syncRes.user.id || userObj.id,
-              username: syncRes.user.username || userObj.username,
-              mobile: syncRes.user.mobile_number || '',
-              displayName: syncRes.profile?.display_name || userObj.displayName,
-              avatarUrl: syncRes.profile?.avatar_url || userObj.avatarUrl,
-              bio: syncRes.profile?.bio || userObj.bio,
-              relationshipStatus: syncRes.profile?.relationship_status || userObj.relationshipStatus
-            };
+            userObj = buildUserObject(firebaseUser, syncRes.user, syncRes.profile);
           }
         } catch (err) {
-          console.warn('Backend sync skipped or offline, continuing with Firebase session:', err);
+          console.warn('Backend sync skipped or offline, continuing with Firebase session:', err?.message || err);
         }
 
         setUser(userObj);
@@ -154,7 +163,39 @@ export const AuthProvider = ({ children }) => {
     }
 
     const credential = await signInWithEmailAndPassword(auth, emailToUse, password);
-    return credential.user;
+    const fbUser = credential.user;
+
+    // Immediately set authenticated state synchronously so route guards allow navigation instantly
+    let userObj = buildUserObject(fbUser);
+    localStorage.setItem('gosh_terms_accepted', 'true');
+    setTermsAccepted(true);
+    setUser(userObj);
+    setProfile(userObj);
+    localStorage.setItem('gosh_saved_user', JSON.stringify(userObj));
+    localStorage.setItem('gosh_saved_profile', JSON.stringify(userObj));
+
+    // Sync in background / await to enrich with backend profile
+    try {
+      const syncRes = await api.syncUser({
+        firebaseUid: fbUser.uid,
+        email: fbUser.email,
+        displayName: userObj.displayName,
+        photoURL: fbUser.photoURL
+      });
+      if (syncRes && syncRes.user) {
+        userObj = buildUserObject(fbUser, syncRes.user, syncRes.profile);
+        setUser(userObj);
+        setProfile(userObj);
+        localStorage.setItem('gosh_saved_user', JSON.stringify(userObj));
+        localStorage.setItem('gosh_saved_profile', JSON.stringify(userObj));
+      }
+    } catch (err) {
+      console.warn('Backend sync deferred or offline:', err?.message || err);
+    }
+
+    socketService.connect(userObj);
+    encryptionService.initUserKeys(userObj.id).catch(console.warn);
+    return userObj;
   };
 
   // Login via Phone Number / Email + OTP
@@ -176,11 +217,14 @@ export const AuthProvider = ({ children }) => {
       relationshipStatus: res.profile?.relationship_status || 'In a soul bond'
     };
 
+    localStorage.setItem('gosh_terms_accepted', 'true');
+    setTermsAccepted(true);
     setUser(userObj);
     setProfile(res.profile || userObj);
     localStorage.setItem('gosh_saved_user', JSON.stringify(userObj));
     localStorage.setItem('gosh_saved_profile', JSON.stringify(res.profile || userObj));
     socketService.connect(userObj);
+    encryptionService.initUserKeys(userObj.id).catch(console.warn);
 
     return userObj;
   };
@@ -189,7 +233,39 @@ export const AuthProvider = ({ children }) => {
   const loginWithGoogle = async () => {
     try {
       const res = await signInWithPopup(auth, googleProvider);
-      return res.user;
+      if (res?.user) {
+        const fbUser = res.user;
+        let userObj = buildUserObject(fbUser);
+        localStorage.setItem('gosh_terms_accepted', 'true');
+        setTermsAccepted(true);
+        setUser(userObj);
+        setProfile(userObj);
+        localStorage.setItem('gosh_saved_user', JSON.stringify(userObj));
+        localStorage.setItem('gosh_saved_profile', JSON.stringify(userObj));
+
+        try {
+          const syncRes = await api.syncUser({
+            firebaseUid: fbUser.uid,
+            email: fbUser.email,
+            displayName: userObj.displayName,
+            photoURL: fbUser.photoURL
+          });
+          if (syncRes && syncRes.user) {
+            userObj = buildUserObject(fbUser, syncRes.user, syncRes.profile);
+            setUser(userObj);
+            setProfile(userObj);
+            localStorage.setItem('gosh_saved_user', JSON.stringify(userObj));
+            localStorage.setItem('gosh_saved_profile', JSON.stringify(userObj));
+          }
+        } catch (syncErr) {
+          console.warn('Backend sync deferred or offline:', syncErr?.message || syncErr);
+        }
+
+        socketService.connect(userObj);
+        encryptionService.initUserKeys(userObj.id).catch(console.warn);
+        return userObj;
+      }
+      return null;
     } catch (popupErr) {
       console.warn('Google Popup Sign-in notice:', popupErr.code, popupErr.message);
 
@@ -224,17 +300,41 @@ export const AuthProvider = ({ children }) => {
       await updateProfile(fbUser, { displayName });
     }
 
-    // 3. Register user in Supabase & Backend
-    const syncRes = await api.syncUser({
-      firebaseUid: fbUser.uid,
-      email,
-      displayName: displayName || email.split('@')[0],
-      username: username?.trim() || email.split('@')[0],
-      mobile_number: mobile?.trim() || null,
-      email_verified: true
+    let userObj = buildUserObject({
+      ...fbUser,
+      displayName: displayName || fbUser.displayName
     });
+    localStorage.setItem('gosh_terms_accepted', 'true');
+    setTermsAccepted(true);
+    setUser(userObj);
+    setProfile(userObj);
+    localStorage.setItem('gosh_saved_user', JSON.stringify(userObj));
+    localStorage.setItem('gosh_saved_profile', JSON.stringify(userObj));
 
-    return syncRes;
+    // 3. Register user in Supabase & Backend
+    try {
+      const syncRes = await api.syncUser({
+        firebaseUid: fbUser.uid,
+        email,
+        displayName: displayName || email.split('@')[0],
+        username: username?.trim() || email.split('@')[0],
+        mobile_number: mobile?.trim() || null,
+        email_verified: true
+      });
+      if (syncRes && syncRes.user) {
+        userObj = buildUserObject(fbUser, syncRes.user, syncRes.profile);
+        setUser(userObj);
+        setProfile(userObj);
+        localStorage.setItem('gosh_saved_user', JSON.stringify(userObj));
+        localStorage.setItem('gosh_saved_profile', JSON.stringify(userObj));
+      }
+    } catch (syncErr) {
+      console.warn('Backend sync deferred or offline:', syncErr?.message || syncErr);
+    }
+
+    socketService.connect(userObj);
+    encryptionService.initUserKeys(userObj.id).catch(console.warn);
+    return userObj;
   };
 
   // Logout

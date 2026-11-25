@@ -30,7 +30,9 @@ import {
   AlertCircle,
   ShieldAlert,
   Info,
-  User
+  User,
+  Download,
+  ExternalLink
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCall } from '../contexts/CallContext';
@@ -319,6 +321,10 @@ export default function ChatsPage() {
       mediaUrl: customPayload?.fileUrl || null,
       audioUrl: customPayload?.audioUrl || null,
       duration: customPayload?.duration || null,
+      fileName: customPayload?.fileName || null,
+      fileSize: customPayload?.fileSize || null,
+      megaFileHandle: customPayload?.megaFileHandle || null,
+      megaDownloadUrl: customPayload?.megaDownloadUrl || null,
       deliveryStatus: 'sent',
       createdAt: new Date().toISOString()
     };
@@ -545,7 +551,9 @@ export default function ChatsPage() {
             messageType: 'audio',
             content: 'Voice Message 🎙️',
             audioUrl,
-            duration: voiceRecordTime
+            duration: voiceRecordTime,
+            megaFileHandle: uploadRes.megaFileHandle || null,
+            megaDownloadUrl: uploadRes.megaDownloadUrl || null
           });
         } catch (err) {
           console.warn('Voice note upload fallback:', err);
@@ -616,7 +624,9 @@ export default function ChatsPage() {
         content: file.name,
         fileUrl,
         fileName: file.name,
-        fileSize: file.size
+        fileSize: file.size,
+        megaFileHandle: uploadRes.megaFileHandle || null,
+        megaDownloadUrl: uploadRes.megaDownloadUrl || null
       });
     } catch (err) {
       console.warn('File upload fallback:', err);
@@ -749,23 +759,23 @@ export default function ChatsPage() {
   const isChatRestricted = !isCurrentChatPermitted();
 
   return (
-    <div className="flex h-full w-full bg-[#08090e] overflow-hidden select-none">
+    <div className="flex h-full w-full max-w-full bg-[#08090e] overflow-hidden select-none">
       {/* =========================================================================
           LEFT PANE: CONVERSATION & CONTACTS LIST (Responsive: hidden on mobile if chat is open)
          ========================================================================= */}
-      <div className={`w-full md:w-80 lg:w-96 flex flex-col border-r border-white/5 bg-[#0f111a] relative ${activeConversation ? 'hidden md:flex' : 'flex'}`}>
+      <div className={`w-full md:w-80 lg:w-96 md:shrink-0 flex flex-col border-r border-white/5 bg-[#0f111a] relative min-w-0 max-w-full ${activeConversation ? 'hidden md:flex' : 'flex'}`}>
         {/* Header */}
         <div className="p-4 flex items-center justify-between border-b border-white/5">
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-bold text-white tracking-wide">
+          <div className="flex items-center gap-2 min-w-0">
+            <h2 className="text-lg font-bold text-white tracking-wide truncate">
               {filterTab === 'contacts' ? 'Contacts' : 'Chats'}
             </h2>
-            <span className="text-[10px] bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full font-semibold border border-rose-500/30 font-mono">
+            <span className="text-[10px] bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full font-semibold border border-rose-500/30 font-mono shrink-0">
               GOSH
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 shrink-0">
             {/* Add Contact / New Chat Button */}
             <button
               onClick={() => {
@@ -808,7 +818,7 @@ export default function ChatsPage() {
           </div>
 
           {/* Filter Chips / Tabs (WhatsApp-style Contact Ecosystem) */}
-          <div className="flex items-center gap-1.5 mt-2.5 overflow-x-auto pb-0.5 scrollbar-none">
+          <div className="flex items-center gap-1.5 mt-2.5 overflow-x-auto pb-0.5 scrollbar-none w-full max-w-full min-w-0">
             {[
               { id: 'all', label: 'Chats' },
               { id: 'contacts', label: `Contacts (${contacts.length})` },
@@ -1043,22 +1053,22 @@ export default function ChatsPage() {
       {/* =========================================================================
           RIGHT PANE: ACTIVE CHAT SCREEN
          ========================================================================= */}
-      <div className={`flex-1 flex flex-col h-full bg-[#08090e] relative ${!activeConversation ? 'hidden md:flex' : 'flex'}`}>
+      <div className={`flex-1 flex flex-col h-full bg-[#08090e] relative min-w-0 max-w-full overflow-hidden ${!activeConversation ? 'hidden md:flex' : 'flex'}`}>
         {activeConversation ? (
           <>
             {/* Chat Top Header */}
-            <div className="h-16 px-4 border-b border-white/5 bg-[#0f111a]/90 backdrop-blur-md flex items-center justify-between z-20">
-              <div className="flex items-center gap-3">
+            <div className="h-16 px-3 sm:px-4 border-b border-white/5 bg-[#0f111a]/90 backdrop-blur-md flex items-center justify-between z-20 min-w-0 max-w-full">
+              <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1 mr-2">
                 {/* Back button (Mobile only) */}
                 <button
                   onClick={() => setActiveConversation(null)}
-                  className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-white"
+                  className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-white shrink-0"
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </button>
 
                 {/* Avatar & Partner Info */}
-                <div className="relative">
+                <div className="relative shrink-0">
                   <img
                     src={activeConversation.avatarUrl || `https://api.dicebear.com/7.x/adventurer/svg?seed=${activeConversation.id}`}
                     alt={activeConversation.name}
@@ -1069,18 +1079,18 @@ export default function ChatsPage() {
                   )}
                 </div>
 
-                <div>
-                  <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-sm font-semibold text-white flex items-center gap-1.5 truncate">
                     {activePartnerContact?.nickname ? (
                       <>
-                        <span className="text-rose-300 font-bold">{activePartnerContact.nickname}</span>
-                        <span className="text-slate-400 font-normal text-xs">({activeConversation.name})</span>
+                        <span className="text-rose-300 font-bold truncate">{activePartnerContact.nickname}</span>
+                        <span className="text-slate-400 font-normal text-xs truncate">({activeConversation.name})</span>
                       </>
                     ) : (
-                      activeConversation.name
+                      <span className="truncate">{activeConversation.name}</span>
                     )}
                   </h3>
-                  <p className="text-[10px] text-rose-400 font-medium flex items-center gap-1">
+                  <p className="text-[10px] text-rose-400 font-medium flex items-center gap-1 truncate">
                     {partnerTyping ? (
                       <span className="animate-pulse flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping" />
@@ -1229,7 +1239,7 @@ export default function ChatsPage() {
             )}
 
             {/* Message Feed Area with Romantic Wallpaper */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3 relative chat-wallpaper-romantic">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 space-y-3 relative chat-wallpaper-romantic w-full max-w-full">
               {/* Romantic background watermark */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-5">
                 <Heart className="w-80 h-80 fill-rose-500" />
@@ -1260,7 +1270,7 @@ export default function ChatsPage() {
                   >
                     {/* Message Bubble Container */}
                     <div
-                      className={`max-w-[85%] md:max-w-md p-3.5 shadow-lg relative text-xs md:text-sm leading-relaxed ${
+                      className={`max-w-[85%] md:max-w-md p-3 sm:p-3.5 shadow-lg relative text-xs md:text-sm leading-relaxed ${
                         isMe ? 'chat-bubble-outgoing' : 'chat-bubble-incoming'
                       }`}
                     >
@@ -1275,30 +1285,83 @@ export default function ChatsPage() {
                       {/* Image Attachment */}
                       {msg.messageType === 'image' && msg.mediaUrl && (
                         <div 
-                          onClick={() => setActiveMediaLightbox(msg.mediaUrl)}
-                          className="mb-2 rounded-xl overflow-hidden cursor-pointer border border-white/10 max-h-60"
+                          onClick={() => setActiveMediaLightbox(api.resolveFileUrl(msg.mediaUrl))}
+                          className="mb-2 rounded-xl overflow-hidden cursor-pointer border border-white/10 max-h-60 relative group/img"
                         >
-                          <img src={msg.mediaUrl} alt="Shared" className="w-full h-full object-cover hover:scale-105 transition" />
+                          <img 
+                            src={api.resolveFileUrl(msg.mediaUrl)} 
+                            alt="Shared" 
+                            className="w-full h-full object-cover hover:scale-105 transition"
+                            loading="lazy" 
+                          />
+                          <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-full text-[10px] text-rose-300 font-medium border border-white/10 flex items-center gap-1 pointer-events-none">
+                            <span>☁️ MEGA</span>
+                          </div>
                         </div>
                       )}
 
                       {/* Video Attachment */}
                       {msg.messageType === 'video' && msg.mediaUrl && (
-                        <div className="mb-2 rounded-xl overflow-hidden border border-white/10 max-h-60">
-                          <video src={msg.mediaUrl} controls className="w-full" />
+                        <div className="mb-2 rounded-xl overflow-hidden border border-white/10 max-h-60 relative">
+                          <video src={api.resolveFileUrl(msg.mediaUrl)} controls className="w-full" preload="metadata" />
+                          <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-full text-[10px] text-purple-300 font-medium border border-white/10 flex items-center gap-1 pointer-events-none">
+                            <span>☁️ MEGA</span>
+                          </div>
                         </div>
                       )}
 
                       {/* Voice Message */}
                       {msg.messageType === 'audio' && msg.audioUrl && (
                         <div className="flex items-center gap-3 py-1">
-                          <audio src={msg.audioUrl} controls className="h-8 max-w-[220px]" />
+                          <audio src={api.resolveFileUrl(msg.audioUrl)} controls className="h-8 max-w-[220px]" />
+                        </div>
+                      )}
+
+                      {/* Document / File Attachment */}
+                      {msg.messageType === 'file' && (msg.mediaUrl || msg.megaDownloadUrl) && (
+                        <div className="mb-2 p-3 rounded-xl bg-white/10 border border-white/15 flex items-center justify-between gap-3 text-white">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="p-2 rounded-lg bg-sky-500/20 text-sky-400 shrink-0">
+                              <FileText className="w-5 h-5" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-medium truncate text-white">{msg.fileName || msg.content || 'Document'}</p>
+                              <div className="flex items-center gap-1.5 text-[10px] text-slate-300">
+                                {msg.fileSize && <span>{(msg.fileSize / 1024).toFixed(1)} KB</span>}
+                                <span>•</span>
+                                <span className="text-rose-300 font-semibold">☁️ MEGA Cloud</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <a
+                              href={api.resolveFileUrl(msg.mediaUrl)}
+                              download={msg.fileName || 'attachment'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1.5 rounded-lg bg-white/10 hover:bg-rose-500/30 text-slate-200 hover:text-white transition"
+                              title="Download Attachment"
+                            >
+                              <Download className="w-4 h-4" />
+                            </a>
+                            {msg.megaDownloadUrl && msg.megaDownloadUrl !== '#' && (
+                              <a
+                                href={msg.megaDownloadUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1.5 rounded-lg bg-white/10 hover:bg-purple-500/30 text-slate-300 hover:text-white transition"
+                                title="Open on MEGA"
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                              </a>
+                            )}
+                          </div>
                         </div>
                       )}
 
                       {/* Text content */}
-                      {msg.content && msg.messageType !== 'audio' && (
-                        <p className="break-words select-text">{msg.content}</p>
+                      {msg.content && (msg.messageType !== 'audio' && (msg.messageType !== 'file' || (msg.fileName && msg.content !== msg.fileName))) && (
+                        <p className="break-words [overflow-wrap:anywhere] select-text">{msg.content}</p>
                       )}
 
                       {/* Footer: Timestamp, ticks, reaction */}
@@ -1400,7 +1463,7 @@ export default function ChatsPage() {
               </div>
             ) : (
               /* Regular Message Composer */
-              <div className="p-3 border-t border-white/5 bg-[#12141f] relative">
+              <div className="p-2.5 sm:p-3 border-t border-white/5 bg-[#12141f] relative w-full max-w-full">
                 {/* Emoji Picker Popup */}
                 {showEmojiPicker && (
                   <div className="absolute bottom-16 left-4 bg-slate-900 border border-white/10 p-3 rounded-2xl shadow-2xl z-30 grid grid-cols-5 gap-2 max-w-xs animate-fadeIn">
@@ -1484,13 +1547,13 @@ export default function ChatsPage() {
                       e.preventDefault();
                       handleSendMessage();
                     }}
-                    className="flex items-center gap-2"
+                    className="flex items-center gap-1.5 sm:gap-2 w-full min-w-0"
                   >
                     {/* Emoji Trigger */}
                     <button
                       type="button"
                       onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                      className="p-2 text-slate-400 hover:text-yellow-400 transition"
+                      className="p-2 text-slate-400 hover:text-yellow-400 transition shrink-0"
                       title="Emojis"
                     >
                       <Smile className="w-5 h-5" />
@@ -1500,7 +1563,7 @@ export default function ChatsPage() {
                     <button
                       type="button"
                       onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
-                      className="p-2 text-slate-400 hover:text-rose-400 transition"
+                      className="p-2 text-slate-400 hover:text-rose-400 transition shrink-0"
                       title="Attach File"
                     >
                       <Paperclip className="w-5 h-5" />
@@ -1512,14 +1575,14 @@ export default function ChatsPage() {
                       value={inputText}
                       onChange={handleInputChange}
                       placeholder="Type a loving message..."
-                      className="flex-1 py-2.5 px-4 rounded-xl glass-input text-xs md:text-sm text-white placeholder-slate-500 focus:outline-none"
+                      className="flex-1 min-w-0 py-2.5 px-3 sm:px-4 rounded-xl glass-input text-xs md:text-sm text-white placeholder-slate-500 focus:outline-none"
                     />
 
                     {/* Voice Record or Send Button */}
                     {inputText.trim() ? (
                       <button
                         type="submit"
-                        className="p-2.5 rounded-xl btn-romantic-primary text-white transition transform hover:scale-105 active:scale-95"
+                        className="p-2.5 rounded-xl btn-romantic-primary text-white transition transform hover:scale-105 active:scale-95 shrink-0"
                       >
                         <Send className="w-4 h-4" />
                       </button>
@@ -1527,7 +1590,7 @@ export default function ChatsPage() {
                       <button
                         type="button"
                         onClick={startVoiceRecording}
-                        className="p-2.5 rounded-xl bg-white/5 hover:bg-rose-500/20 text-slate-300 hover:text-rose-400 transition"
+                        className="p-2.5 rounded-xl bg-white/5 hover:bg-rose-500/20 text-slate-300 hover:text-rose-400 transition shrink-0"
                         title="Hold to Record Voice Message"
                       >
                         <Mic className="w-4 h-4" />

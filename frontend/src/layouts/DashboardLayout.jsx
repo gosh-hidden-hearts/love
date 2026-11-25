@@ -29,6 +29,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { useCall } from '../contexts/CallContext';
 import InstallPWA from '../components/InstallPWA';
+import logoImg from '../assets/logo.png';
 
 export default function DashboardLayout() {
   const navigate = useNavigate();
@@ -93,19 +94,19 @@ export default function DashboardLayout() {
   ];
 
   return (
-    <div className="flex h-screen w-screen bg-[#08090e] text-slate-100 overflow-hidden select-none">
+    <div className="flex h-screen h-[100dvh] w-full max-w-full bg-[#08090e] text-slate-100 overflow-hidden select-none">
       {/* =========================================================================
           DESKTOP SIDEBAR NAVIGATION (Hidden on mobile)
          ========================================================================= */}
-      <aside className="hidden md:flex flex-col items-center justify-between w-20 bg-[#0f111a] border-r border-white/5 py-5 z-30 select-none">
+      <aside className="hidden md:flex flex-col items-center justify-between w-20 shrink-0 bg-[#0f111a] border-r border-white/5 py-5 z-30 select-none">
         {/* Top: Brand Logo */}
         <div 
           className="flex flex-col items-center gap-1.5 cursor-pointer group" 
           onClick={() => navigate('/chats')}
           title="GOSH — Hidden Hearts"
         >
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-rose-500/20 via-purple-600/20 to-pink-500/30 border border-rose-500/30 flex items-center justify-center text-rose-500 shadow-glow-pink group-hover:scale-105 transition-all duration-300">
-            <Heart className="w-5 h-5 fill-rose-500 animate-pulse-slow" />
+          <div className="w-11 h-11 rounded-2xl overflow-hidden border border-rose-500/30 shadow-glow-pink group-hover:scale-105 transition-all duration-300 bg-[#0c0d18]">
+            <img src={logoImg} alt="GOSH Logo" className="w-full h-full object-cover" />
           </div>
           <span className="text-[10px] font-bold tracking-widest text-rose-400 font-mono">GOSH</span>
         </div>
@@ -193,20 +194,20 @@ export default function DashboardLayout() {
       {/* =========================================================================
           MAIN APPLICATION VIEW AREA (Router Outlet + Mobile Top & Bottom Navigation)
          ========================================================================= */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden relative">
+      <main className="flex-1 flex flex-col h-full overflow-hidden relative min-w-0 max-w-full">
         {/* Mobile Top Header (Visible only on small screens) */}
         <header className="md:hidden flex items-center justify-between h-14 px-4 bg-[#0f111a]/95 backdrop-blur-md border-b border-white/5 z-30 select-none">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/chats')}>
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-rose-500/20 to-purple-600/30 border border-rose-500/30 flex items-center justify-center text-rose-500">
-              <Heart className="w-4 h-4 fill-rose-500 animate-pulse-slow" />
+          <div className="flex items-center gap-2.5 cursor-pointer min-w-0" onClick={() => navigate('/chats')}>
+            <div className="w-8 h-8 rounded-xl overflow-hidden border border-rose-500/30 shadow-glow-pink flex-shrink-0 bg-[#0c0d18]">
+              <img src={logoImg} alt="GOSH Logo" className="w-full h-full object-cover" />
             </div>
-            <div>
-              <span className="text-sm font-bold text-white tracking-wide">GOSH</span>
-              <span className="block text-[8px] uppercase tracking-wider text-rose-400 font-mono -mt-1">Hidden Hearts</span>
+            <div className="min-w-0">
+              <span className="text-sm font-bold text-white tracking-wide truncate block">GOSH</span>
+              <span className="block text-[8px] uppercase tracking-wider text-rose-400 font-mono -mt-1 truncate">Hidden Hearts</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <button 
               onClick={() => navigate('/settings')}
               className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white"
@@ -229,7 +230,7 @@ export default function DashboardLayout() {
         </header>
 
         {/* Page Content Outlet */}
-        <div className="flex-1 overflow-hidden relative">
+        <div className="flex-1 overflow-hidden relative min-w-0 max-w-full">
           <Outlet />
         </div>
 

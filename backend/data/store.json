@@ -26,6 +26,15 @@
       "mobile_number": null,
       "email_verified": false,
       "created_at": "2026-11-20T16:49:32.869Z"
+    },
+    {
+      "id": "usr-1795238428722",
+      "firebase_uid": "RGgcjIc6BHVtuBVWwfyWlRpGk7R2",
+      "email": "sharanyasiva4@gmail.com",
+      "username": "sharanyasiva4",
+      "mobile_number": null,
+      "email_verified": false,
+      "created_at": "2026-11-21T05:20:28.723Z"
     }
   ],
   "profiles": [
@@ -45,7 +54,9 @@
       "relationship_status": "In a soul bond",
       "created_at": "2026-11-20T16:22:23.968Z",
       "anniversary_date": "",
-      "updated_at": "2026-11-20T16:24:10.614Z"
+      "updated_at": "2026-11-20T16:24:10.614Z",
+      "online_status": false,
+      "last_seen": "2026-11-21T05:18:46.371Z"
     },
     {
       "user_id": "usr-1795193372869",
@@ -53,7 +64,19 @@
       "avatar_url": "https://lh3.googleusercontent.com/a/ACg8ocKmAOyFmNs5q-NfurLM8VBy7BPuqFDKHfLf4DHXxqPf8qXYSw=s96-c",
       "bio": "In a love story written by the stars ✨",
       "relationship_status": "In a soul bond",
-      "created_at": "2026-11-20T16:49:32.869Z"
+      "created_at": "2026-11-20T16:49:32.869Z",
+      "online_status": false,
+      "last_seen": "2026-11-21T05:46:44.772Z"
+    },
+    {
+      "user_id": "usr-1795238428722",
+      "display_name": "sharanyasiva4",
+      "avatar_url": "https://api.dicebear.com/7.x/adventurer/svg?seed=RGgcjIc6BHVtuBVWwfyWlRpGk7R2",
+      "bio": "In a love story written by the stars ✨",
+      "relationship_status": "In a soul bond",
+      "created_at": "2026-11-21T05:20:28.723Z",
+      "online_status": false,
+      "last_seen": "2026-11-21T05:46:52.756Z"
     }
   ],
   "identifiers": [],
@@ -119,25 +142,60 @@
       "duration": null,
       "deliveryStatus": "sent",
       "createdAt": "2026-11-20T16:51:05.104Z"
-    }
-  ],
-  "statuses": [
+    },
     {
-      "id": "status-1795193534367",
-      "userId": "usr-1795193372869",
-      "userName": "GOSH",
-      "userAvatar": "https://lh3.googleusercontent.com/a/ACg8ocKmAOyFmNs5q-NfurLM8VBy7BPuqFDKHfLf4DHXxqPf8qXYSw=s96-c",
-      "type": "media",
-      "content": null,
-      "gradient": null,
-      "caption": null,
-      "mediaUrl": "/uploads/status_1795193534090.jpg",
-      "createdAt": "2026-11-20T16:52:14.367Z",
-      "viewsCount": 0,
-      "viewers": []
+      "id": "msg-1795238106085",
+      "conversationId": "partner-demo",
+      "senderId": "usr-1795191743968",
+      "senderName": "prasanthgokul736",
+      "replyToId": null,
+      "replyToText": null,
+      "messageType": "text",
+      "content": "hello",
+      "mediaUrl": null,
+      "audioUrl": null,
+      "duration": null,
+      "deliveryStatus": "sent",
+      "createdAt": "2026-11-21T05:15:06.085Z",
+      "targetUserId": "partner-demo"
+    },
+    {
+      "id": "msg-1795238118734",
+      "conversationId": "partner-demo",
+      "senderId": "usr-1795193372869",
+      "senderName": "GOSH",
+      "replyToId": null,
+      "replyToText": null,
+      "messageType": "text",
+      "content": "sollu",
+      "mediaUrl": null,
+      "audioUrl": null,
+      "duration": null,
+      "deliveryStatus": "sent",
+      "createdAt": "2026-11-21T05:15:18.734Z",
+      "targetUserId": "partner-demo"
     }
   ],
+  "statuses": [],
   "calls": [
+    {
+      "id": "call-1795252183019",
+      "callerId": "test-user-1",
+      "receiverId": "test-user-2",
+      "callType": "video",
+      "callStatus": "ended",
+      "durationSeconds": 120,
+      "createdAt": "2026-11-21T09:09:43.019Z"
+    },
+    {
+      "id": "call-1795248639860",
+      "callerId": "test-user-1",
+      "receiverId": "test-user-2",
+      "callType": "video",
+      "callStatus": "ended",
+      "durationSeconds": 120,
+      "createdAt": "2026-11-21T08:10:39.860Z"
+    },
     {
       "id": "call-1795193515858",
       "callerId": "usr-1795193372869",
@@ -186,6 +244,27 @@
       "accepted_at": "2026-11-20T16:48:57.267Z",
       "ip_address": "::1",
       "id": "terms-1795193337711"
+    },
+    {
+      "terms_version": "1.0.0",
+      "privacy_version": "1.0.0",
+      "accepted_at": "2026-11-21T05:10:04.643Z",
+      "ip_address": "::1",
+      "id": "terms-1795237805766"
+    },
+    {
+      "terms_version": "1.0.0",
+      "privacy_version": "1.0.0",
+      "accepted_at": "2026-11-21T08:10:37.184Z",
+      "ip_address": "::1",
+      "id": "terms-1795248638340"
+    },
+    {
+      "terms_version": "1.0.0",
+      "privacy_version": "1.0.0",
+      "accepted_at": "2026-11-21T09:09:40.478Z",
+      "ip_address": "::1",
+      "id": "terms-1795252181705"
     }
   ],
   "otp_verifications": [
@@ -197,6 +276,67 @@
       "expires_at": "2026-11-20T16:31:56.448Z",
       "is_used": true,
       "created_at": "2026-11-20T16:21:56.630Z"
+    },
+    {
+      "id": "otp-1795235168577",
+      "email": "gosh81416@gmail.com",
+      "otp_hash": "$2a$10$1WMvxkMw5WiGtZh4IBEVbOTz/v94ABhzJQCYkTUZ.rzh3iaqHJx4C",
+      "purpose": "signup",
+      "expires_at": "2026-11-21T04:36:08.554Z",
+      "is_used": false,
+      "created_at": "2026-11-21T04:26:08.577Z"
+    },
+    {
+      "id": "otp-1795238404297",
+      "email": "sharanyasiva4@gmail.com",
+      "otp_hash": "$2a$10$hoHf4rlN.L.rSFe4rgcsCO6D.eep69fo8LD8qu2sOsNkNqV4gcJxi",
+      "purpose": "signup",
+      "expires_at": "2026-11-21T05:30:03.862Z",
+      "is_used": true,
+      "created_at": "2026-11-21T05:20:04.297Z"
+    },
+    {
+      "id": "otp-1795248797632",
+      "email": "gosh81416@gmail.com",
+      "otp_hash": "$2a$10$lJqOvdevrYMxrqG.3mxFTeYVaVs8tGeMaROKvviriB0lLrKmwHqlC",
+      "purpose": "signup",
+      "expires_at": "2026-11-21T08:23:17.372Z",
+      "is_used": true,
+      "created_at": "2026-11-21T08:13:17.632Z"
+    },
+    {
+      "id": "otp-1795253597793",
+      "email": "prasanthgokul736@gmail.com",
+      "otp_hash": "$2a$10$UWBpx2PpSJfHeQ.TwBf4guQrKFmkFFXQPZVQ2/44DYaCKvn6ZkcVe",
+      "purpose": "signup",
+      "expires_at": "2026-11-21T09:43:17.358Z",
+      "is_used": true,
+      "created_at": "2026-11-21T09:33:17.793Z"
+    },
+    {
+      "id": "otp-1795253882227",
+      "email": "prasanthgokul736@gmail.com",
+      "otp_hash": "$2a$10$8q.EqsuMyotkVLKIxG4db.qVYo2RAGLQlchPqmP9GGCGq48Yp1Qlq",
+      "purpose": "signup",
+      "expires_at": "2026-11-21T09:48:01.351Z",
+      "is_used": true,
+      "created_at": "2026-11-21T09:38:02.227Z"
+    },
+    {
+      "id": "otp-1795255997905",
+      "email": "gosh81416@gmail.com",
+      "otp_hash": "$2a$10$2LsoJAWgDSoUCIEDRW8gJuDGQlaywmV0bA030qTC02ZY52UmuGOdO",
+      "purpose": "signup",
+      "expires_at": "2026-11-21T10:23:17.865Z",
+      "is_used": false,
+      "created_at": "2026-11-21T10:13:17.905Z"
     }
-  ]
+  ],
+  "contacts": [],
+  "blocked_users": [],
+  "public_keys": {
+    "usr-1795193372869": "{\"crv\":\"P-256\",\"ext\":true,\"key_ops\":[],\"kty\":\"EC\",\"x\":\"CRZpILYiUpquE4ZMj0I6077jiKzOhEAhwTOYZJZMr2c\",\"y\":\"SsEmKQhGsNFN8HdxUC8WryMwQ_zPcFFtfGQ4yZb-VBU\"}",
+    "usr-1795191743968": "{\"crv\":\"P-256\",\"ext\":true,\"key_ops\":[],\"kty\":\"EC\",\"x\":\"H4cwuGW6YIAgUqfMeOsYnzujjCAyNRPPxho6bdiYGoc\",\"y\":\"7PD5OxbTsgQ7bNxTPJ1UalV-WUWKI-LuvC_wcB56fJk\"}",
+    "usr-1795238428722": "{\"crv\":\"P-256\",\"ext\":true,\"key_ops\":[],\"kty\":\"EC\",\"x\":\"aNEEgXjGbPZUUFfAw1zpES0qv317Od5uS1XNLGNGQcE\",\"y\":\"lGsOfNdrg9EltlegFepNxQnvRbhjl9TNafqj-S-pb30\"}"
+  }
 }

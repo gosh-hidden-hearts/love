@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Download, X, Smartphone, Sparkles, CheckCircle2, ChevronRight, Info } from 'lucide-react';
+import logoImg from '../assets/logo.png';
 
 export default function InstallPWA() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -79,15 +80,15 @@ export default function InstallPWA() {
   return (
     <>
       {/* Floating Bottom Install Banner */}
-      <div className="fixed bottom-20 md:bottom-6 left-4 right-4 md:left-auto md:right-6 md:w-96 z-50 animate-fade-in-up">
+      <div className="fixed bottom-20 md:bottom-6 left-4 right-4 md:left-auto md:right-6 md:w-96 max-w-[calc(100vw-2rem)] z-50 animate-fade-in-up">
         <div className="bg-[#0f111a]/95 backdrop-blur-xl border border-rose-500/30 rounded-2xl p-4 shadow-2xl shadow-rose-950/40 relative overflow-hidden">
           {/* Subtle gradient glow */}
           <div className="absolute -top-10 -right-10 w-28 h-28 bg-rose-500/15 rounded-full blur-2xl pointer-events-none" />
 
           <div className="flex items-start justify-between gap-3 relative z-10">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-rose-500 to-pink-600 flex items-center justify-center text-white shadow-lg shadow-rose-500/30 flex-shrink-0">
-                <Smartphone className="w-6 h-6" />
+              <div className="w-12 h-12 rounded-2xl overflow-hidden border border-rose-500/40 shadow-glow-pink flex-shrink-0 bg-[#0c0d18]">
+                <img src={logoImg} alt="GOSH App Icon" className="w-full h-full object-cover" />
               </div>
               <div>
                 <div className="flex items-center gap-1.5">
@@ -142,8 +143,8 @@ export default function InstallPWA() {
             </button>
 
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400">
-                <Smartphone className="w-5 h-5" />
+              <div className="w-12 h-12 rounded-2xl overflow-hidden border border-rose-500/40 shadow-glow-pink flex-shrink-0 bg-[#0c0d18]">
+                <img src={logoImg} alt="GOSH App Icon" className="w-full h-full object-cover" />
               </div>
               <div>
                 <h3 className="text-base font-bold text-white">Install on Android Chrome</h3>

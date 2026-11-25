@@ -3,7 +3,7 @@
  * Designed for GitHub Pages (/love/) and Mobile Standalone Experience
  */
 
-const CACHE_NAME = 'gosh-cache-v1.1';
+const CACHE_NAME = 'gosh-cache-v1.4';
 
 // Derive scope base path automatically (e.g. '/love' on GitHub Pages or '' on root)
 const SCOPE_PATH = self.location.pathname.replace(/\/sw\.js$/, '');
@@ -13,8 +13,12 @@ const CORE_ASSETS = [
   BASE_URL,
   BASE_URL + 'index.html',
   BASE_URL + 'manifest.json',
+  BASE_URL + 'logo.png',
+  BASE_URL + 'favicon.ico',
   BASE_URL + 'icons/icon-192.png',
+  BASE_URL + 'icons/icon-192-maskable.png',
   BASE_URL + 'icons/icon-512.png',
+  BASE_URL + 'icons/icon-512-maskable.png',
   BASE_URL + 'icons/apple-touch-icon.png'
 ];
 
@@ -112,7 +116,7 @@ self.addEventListener('fetch', (event) => {
       }
 
       return fetch(request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+        if (!networkResponse || networkResponse.status !== 200 || (networkResponse.type !== 'basic' && networkResponse.type !== 'cors')) {
           return networkResponse;
         }
         const responseClone = networkResponse.clone();

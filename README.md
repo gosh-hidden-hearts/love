@@ -191,12 +191,25 @@ GOSH/
 
 ---
 
+## 📚 Complete Project Documentation
+
+For deep technical insights, schemas, security models, and deployment workflows, consult the dedicated guides:
+- 🏛️ **[ARCHITECTURE.md](file:///e:/Projects/GOSH/ARCHITECTURE.md)** — High-level architecture, E2EE key exchange flow, WebRTC signaling diagrams, and resilience strategies.
+- 🗄️ **[DATABASE_SCHEMA.md](file:///e:/Projects/GOSH/DATABASE_SCHEMA.md)** — Supabase PostgreSQL database tables, relationships, and Row Level Security (RLS) policies.
+- 🛡️ **[SECURITY.md](file:///e:/Projects/GOSH/SECURITY.md)** — Zero-knowledge End-to-End Encryption (ECDH P-256 + AES-GCM), token security, and credential isolation.
+- 🧪 **[TESTING.md](file:///e:/Projects/GOSH/TESTING.md)** — Automated test execution, manual verification procedures, and multi-device checklists.
+- 🚀 **[DEPLOYMENT.md](file:///e:/Projects/GOSH/DEPLOYMENT.md)** — Zero-cost production deployment to GitHub Pages / Vercel, Render.com backend, and SSL setup.
+- 📱 **[MOBILE_DEPLOYMENT.md](file:///e:/Projects/GOSH/MOBILE_DEPLOYMENT.md)** — Capacitor Android Studio APK generation, iOS packaging, and PWA installation.
+
+---
+
 ## 🔒 Security & Privacy Notes
 
 - Plain-text passwords are never stored in the database. Authentication is mediated through Firebase Authentication.
 - All email OTPs are securely hashed using `bcrypt` and invalidated upon use or expiration.
 - Real-time media uploaded to the Memory Vault is routed and stored directly in MEGA Cloud Storage without exposing cloud credentials to the client.
 - WebRTC media streams are end-to-end encrypted peer-to-peer using DTLS-SRTP.
+- 1-to-1 chat messaging is protected by native W3C Web Crypto End-to-End Encryption (ECDH P-256 + AES-256-GCM).
 
 ---
 
