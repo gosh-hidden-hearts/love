@@ -3,8 +3,7 @@ import db from '../repositories/databaseRepository.js';
 export const statusController = {
   async getStatuses(req, res) {
     try {
-      const { userId } = req.query;
-      const { statuses, myStatuses } = await db.getStatuses(userId);
+      const { statuses, myStatuses } = await db.getStatuses(req.user.id);
       return res.json({ success: true, statuses, myStatuses });
     } catch (err) {
       return res.status(500).json({ success: false, message: err.message });
@@ -13,31 +12,26 @@ export const statusController = {
 
   async createStatus(req, res) {
     try {
-      const { userId, userName, userAvatar, statusType, content, gradient, caption, privacy } = req.body;
+      const { userName, userAvatar, statusType, content, gradient, caption } = req.body;
       const file = req.file;
 
       const now = new Date();
       const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
-      const newStatus = {
-        id: 'status-' + Date.now(),
-        userId: userId || 'user',
-        userName: userName || 'Soul User',
+      const saved = await db.saveStatus({
+        userId: req.user.id,
+        userName: userName || req.user.username || 'Soul User',
         userAvatar: userAvatar || null,
         type: statusType || 'text',
         content: content || null,
-        gradient: gradient || null,
+        gradient: gradient || '#2e0854',
         caption: caption || null,
         mediaUrl: file ? `/uploads/${file.filename}` : null,
-        privacy: privacy || 'contacts',
         createdAt: now.toISOString(),
-        expiresAt: expiresAt.toISOString(),
-        viewsCount: 0,
-        viewers: []
-      };
+        expiresAt: expiresAt.toISOString()
+      });
 
-      await db.saveStatus(newStatus);
-      return res.json({ success: true, status: newStatus });
+      return res.json({ success: true, status: saved });
     } catch (err) {
       return res.status(500).json({ success: false, message: err.message });
     }
@@ -46,8 +40,7 @@ export const statusController = {
   async markViewed(req, res) {
     try {
       const { statusId } = req.params;
-      const { viewerId, viewerName } = req.body;
-      const updated = await db.markStatusViewed(statusId, viewerId, viewerName);
+      const updated = await db.markStatusViewed(statusId, req.user.id);
       return res.json({ success: true, status: updated });
     } catch (err) {
       return res.status(500).json({ success: false, message: err.message });
@@ -57,7 +50,7 @@ export const statusController = {
   async deleteStatus(req, res) {
     try {
       const { statusId } = req.params;
-      await db.deleteStatus(statusId);
+      await db.deleteStatus(statusId, req.user.id);
       return res.json({ success: true, message: 'Status deleted successfully' });
     } catch (err) {
       return res.status(500).json({ success: false, message: err.message });

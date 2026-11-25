@@ -1,88 +1,161 @@
-import db from '../repositories/databaseRepository.js';
+import db, { isUuid } from '../repositories/databaseRepository.js';
+import { resolveAuthenticatedUser } from '../middleware/authMiddleware.js';
 
 export function setupRealtimeService(io) {
   // Map of userId -> Set of socketIds
   const onlineUsers = new Map();
 
-  io.on('connection', (socket) => {
-    let currentUserId = null;
+  // Authenticate every Socket.io connection using verified session JWT or Firebase ID token
+  io.use(async (socket, next) => {
+    try {
+      const token =
+        socket.handshake.auth?.token ||
+        (socket.handshake.headers?.authorization?.startsWith('Bearer ')
+          ? socket.handshake.headers.authorization.split(' ')[1]
+          : null);
 
-    // User comes online
-    socket.on('user_online', async (data) => {
-      const { userId, displayName } = data;
-      if (!userId) return;
-
-      currentUserId = userId;
-      if (!onlineUsers.has(userId)) {
-        onlineUsers.set(userId, new Set());
+      if (!token) {
+        return next(new Error('Authentication token required for realtime connection.'));
       }
-      onlineUsers.get(userId).add(socket.id);
 
-      console.log(`🟢 User online: ${displayName || userId} (${socket.id})`);
+      const verifiedUser = await resolveAuthenticatedUser(token);
+      socket.user = verifiedUser;
+      return next();
+    } catch (err) {
+      return next(new Error(`Unauthorized socket connection: ${err.message}`));
+    }
+  });
 
-      // Update database profile presence
+  function emitToUser(userId, event, payload) {
+    const sockets = onlineUsers.get(userId);
+    if (sockets) {
+      sockets.forEach((socketId) => {
+        io.to(socketId).emit(event, payload);
+      });
+    }
+  }
+
+  async function markOfflineIfNoSockets(userId, socketId) {
+    if (!userId || !onlineUsers.has(userId)) return;
+    const userSockets = onlineUsers.get(userId);
+    userSockets.delete(socketId);
+
+    if (userSockets.size === 0) {
+      onlineUsers.delete(userId);
+      const lastSeenIso = new Date().toISOString();
+      console.log(`🔴 User offline: ${userId}`);
+
       try {
-        await db.updateOnlinePresence(userId, true, 'Online');
+        await db.updateOnlinePresence(userId, false, lastSeenIso);
       } catch (err) {
-        console.error('Failed to update presence in DB:', err);
+        console.error('Failed to update offline presence:', err.message);
       }
 
-      // Broadcast presence update
       io.emit('presence_update', {
         userId,
+        online: false,
+        lastSeen: lastSeenIso
+      });
+    }
+  }
+
+  io.on('connection', (socket) => {
+    const authenticatedUserId = socket.user.id;
+
+    // Register socket immediately upon authenticated connection
+    if (!onlineUsers.has(authenticatedUserId)) {
+      onlineUsers.set(authenticatedUserId, new Set());
+    }
+    onlineUsers.get(authenticatedUserId).add(socket.id);
+
+    // User comes online
+    socket.on('user_online', async (data = {}) => {
+      const nowIso = new Date().toISOString();
+      console.log(`🟢 User online: ${data.displayName || socket.user.username || authenticatedUserId} (${socket.id})`);
+
+      try {
+        await db.updateOnlinePresence(authenticatedUserId, true, nowIso);
+      } catch (err) {
+        console.error('Failed to update presence in DB:', err.message);
+      }
+
+      io.emit('presence_update', {
+        userId: authenticatedUserId,
         online: true,
-        lastSeen: 'Online'
+        lastSeen: nowIso
       });
     });
 
-    // Real-time Chat Messaging (Contact-Restricted)
-    socket.on('send_message', async (messageData) => {
-      const senderId = messageData.senderId;
-      const targetUserId = messageData.targetUserId;
+    // Explicit offline event
+    socket.on('user_offline', async () => {
+      await markOfflineIfNoSockets(authenticatedUserId, socket.id);
+    });
 
-      // Contact-only authorization check for 1-to-1 direct messages
-      if (senderId && targetUserId && senderId !== targetUserId) {
-        const isContact = await db.isContact(senderId, targetUserId);
-        if (!isContact) {
-          console.warn(`🚫 Blocked socket message: ${senderId} -> ${targetUserId} (Not a contact)`);
-          socket.emit('message_blocked', {
-            conversationId: messageData.conversationId,
-            code: 'NOT_A_CONTACT',
-            message: 'You can only message users who are saved in your contacts.'
-          });
-          return;
+    // Real-time Chat Messaging (Contact-Restricted for 1-to-1, Membership-Checked for Groups)
+    socket.on('send_message', async (messageData = {}) => {
+      try {
+        const senderId = authenticatedUserId;
+        const conversationId = messageData.conversationId;
+        let targetUserId = messageData.targetUserId;
+
+        if (isUuid(conversationId)) {
+          const conv = await db.getConversationById(conversationId, senderId);
+          if (!conv || !conv.members.includes(senderId)) {
+            socket.emit('message_blocked', {
+              conversationId,
+              code: 'UNAUTHORIZED_CONVERSATION',
+              message: 'You are not a member of this conversation.'
+            });
+            return;
+          }
+
+          if (conv.isGroup) {
+            conv.members
+              .filter((memberId) => memberId !== senderId)
+              .forEach((memberId) => emitToUser(memberId, 'receive_message', { ...messageData, senderId }));
+            return;
+          }
+
+          targetUserId = conv.members.find((m) => m !== senderId) || targetUserId;
         }
-      }
 
-      console.log(`💬 Message from ${senderId} to ${targetUserId}`);
-      if (targetUserId && onlineUsers.has(targetUserId)) {
-        onlineUsers.get(targetUserId).forEach((socketId) => {
-          io.to(socketId).emit('receive_message', messageData);
-        });
+        if (targetUserId && targetUserId !== senderId) {
+          const isAllowed = await db.isContact(senderId, targetUserId);
+          if (!isAllowed) {
+            console.warn(`🚫 Blocked socket message: ${senderId} -> ${targetUserId} (Not a contact)`);
+            socket.emit('message_blocked', {
+              conversationId,
+              code: 'NOT_A_CONTACT',
+              message: 'You can only message users who are saved in your contacts.'
+            });
+            return;
+          }
+          emitToUser(targetUserId, 'receive_message', { ...messageData, senderId });
+        }
+      } catch (err) {
+        console.error('Socket send_message error:', err.message);
       }
     });
 
     // Typing Indicators (Contact-Restricted)
-    socket.on('typing', async (data) => {
-      const { targetUserId, userId, conversationId } = data;
-      if (userId && targetUserId && onlineUsers.has(targetUserId)) {
-        const isContact = await db.isContact(userId, targetUserId);
-        if (isContact) {
-          onlineUsers.get(targetUserId).forEach((socketId) => {
-            io.to(socketId).emit('user_typing', { userId, conversationId });
-          });
+    socket.on('typing', async (data = {}) => {
+      const { targetUserId, conversationId } = data;
+      const userId = authenticatedUserId;
+      if (targetUserId && onlineUsers.has(targetUserId)) {
+        const isAllowed = await db.isContact(userId, targetUserId).catch(() => false);
+        if (isAllowed) {
+          emitToUser(targetUserId, 'user_typing', { userId, conversationId });
         }
       }
     });
 
-    socket.on('stop_typing', async (data) => {
-      const { targetUserId, userId, conversationId } = data;
-      if (userId && targetUserId && onlineUsers.has(targetUserId)) {
-        const isContact = await db.isContact(userId, targetUserId);
-        if (isContact) {
-          onlineUsers.get(targetUserId).forEach((socketId) => {
-            io.to(socketId).emit('user_stop_typing', { userId, conversationId });
-          });
+    socket.on('stop_typing', async (data = {}) => {
+      const { targetUserId, conversationId } = data;
+      const userId = authenticatedUserId;
+      if (targetUserId && onlineUsers.has(targetUserId)) {
+        const isAllowed = await db.isContact(userId, targetUserId).catch(() => false);
+        if (isAllowed) {
+          emitToUser(targetUserId, 'user_stop_typing', { userId, conversationId });
         }
       }
     });
@@ -90,87 +163,51 @@ export function setupRealtimeService(io) {
     // =========================================================================
     // WEBRTC SIGNALING (Audio & Video Calls - Contact-Restricted)
     // =========================================================================
-    socket.on('call_user', async (data) => {
-      console.log(`📞 Call initiated by ${data.callerName} (${data.callerId}) to ${data.receiverId}`);
-      if (data.callerId && data.receiverId) {
-        const isContact = await db.isContact(data.callerId, data.receiverId);
-        if (!isContact) {
-          socket.emit('call_rejected', { reason: 'Calling restricted: User is not in your contacts.' });
-          return;
-        }
+    socket.on('call_user', async (data = {}) => {
+      const callerId = authenticatedUserId;
+      const receiverId = data.receiverId;
+      console.log(`📞 Call initiated by ${data.callerName || callerId} (${callerId}) to ${receiverId}`);
+
+      if (!receiverId) return;
+      const isAllowed = await db.isContact(callerId, receiverId).catch(() => false);
+      if (!isAllowed) {
+        socket.emit('call_rejected', { reason: 'Calling restricted: User is not in your contacts.' });
+        return;
       }
-      const receiverSockets = onlineUsers.get(data.receiverId);
-      if (receiverSockets) {
-        receiverSockets.forEach((socketId) => {
-          io.to(socketId).emit('incoming_call', data);
-        });
+
+      if (onlineUsers.has(receiverId)) {
+        emitToUser(receiverId, 'incoming_call', { ...data, callerId });
       } else {
         socket.emit('call_rejected', { reason: 'User is offline' });
       }
     });
 
-    socket.on('accept_call', (data) => {
-      console.log(`✅ Call accepted by user for caller: ${data.callerId}`);
-      const callerSockets = onlineUsers.get(data.callerId);
-      if (callerSockets) {
-        callerSockets.forEach((socketId) => {
-          io.to(socketId).emit('call_accepted', data);
-        });
+    socket.on('accept_call', (data = {}) => {
+      if (data.callerId) {
+        emitToUser(data.callerId, 'call_accepted', { ...data, responderId: authenticatedUserId });
       }
     });
 
-    socket.on('reject_call', (data) => {
-      console.log(`❌ Call rejected for caller: ${data.callerId}`);
-      const callerSockets = onlineUsers.get(data.callerId);
-      if (callerSockets) {
-        callerSockets.forEach((socketId) => {
-          io.to(socketId).emit('call_rejected', data);
-        });
+    socket.on('reject_call', (data = {}) => {
+      if (data.callerId) {
+        emitToUser(data.callerId, 'call_rejected', data);
       }
     });
 
-    socket.on('end_call', (data) => {
-      console.log(`⏹️ Call ended for target: ${data.targetUserId}`);
-      const targetSockets = onlineUsers.get(data.targetUserId);
-      if (targetSockets) {
-        targetSockets.forEach((socketId) => {
-          io.to(socketId).emit('call_ended', data);
-        });
+    socket.on('end_call', (data = {}) => {
+      if (data.targetUserId) {
+        emitToUser(data.targetUserId, 'call_ended', data);
       }
     });
 
-    socket.on('ice_candidate', (data) => {
-      const targetSockets = onlineUsers.get(data.targetUserId);
-      if (targetSockets) {
-        targetSockets.forEach((socketId) => {
-          io.to(socketId).emit('ice_candidate', data);
-        });
+    socket.on('ice_candidate', (data = {}) => {
+      if (data.targetUserId) {
+        emitToUser(data.targetUserId, 'ice_candidate', data);
       }
     });
 
-    // Disconnect cleanup
     socket.on('disconnect', async () => {
-      if (currentUserId && onlineUsers.has(currentUserId)) {
-        const userSockets = onlineUsers.get(currentUserId);
-        userSockets.delete(socket.id);
-        if (userSockets.size === 0) {
-          onlineUsers.delete(currentUserId);
-          const lastSeenTime = new Date().toISOString();
-          console.log(`🔴 User offline: ${currentUserId}`);
-          
-          try {
-            await db.updateOnlinePresence(currentUserId, false, lastSeenTime);
-          } catch (err) {
-            console.error('Failed to update offline presence:', err);
-          }
-
-          io.emit('presence_update', {
-            userId: currentUserId,
-            online: false,
-            lastSeen: lastSeenTime
-          });
-        }
-      }
+      await markOfflineIfNoSockets(authenticatedUserId, socket.id);
     });
   });
 }

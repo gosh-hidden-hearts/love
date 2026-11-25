@@ -1,11 +1,11 @@
 import db from '../repositories/databaseRepository.js';
 
 export const userController = {
-  // Search users for contact discovery
+  // Search users for contact discovery (excludes current user)
   async searchUsers(req, res) {
     try {
       const { q } = req.query;
-      const users = await db.searchUsers(q);
+      const users = await db.searchUsers(q, req.user.id);
       return res.json({ success: true, users });
     } catch (err) {
       return res.status(500).json({ success: false, message: err.message });
@@ -16,32 +16,55 @@ export const userController = {
   async getProfile(req, res) {
     try {
       const { userId } = req.params;
-      const user = await db.findUserByIdentifier(userId);
+      const targetId = userId === 'me' ? req.user.id : userId;
+      const user = await db.findUserById(targetId);
       if (!user) {
         return res.status(404).json({ success: false, message: 'User not found' });
       }
-      return res.json({ success: true, user, profile: user.user_profiles });
+
+      // Never leak private email/mobile of other users
+      const sanitizedUser = targetId === req.user.id
+        ? user
+        : {
+            id: user.id,
+            username: user.username,
+            status: user.status,
+            user_profiles: user.user_profiles
+          };
+
+      return res.json({ success: true, user: sanitizedUser, profile: user.user_profiles });
     } catch (err) {
       return res.status(500).json({ success: false, message: err.message });
     }
   },
 
-  // Update profile
+  // Update own profile only
   async updateProfile(req, res) {
     try {
       const { userId } = req.params;
+      if (userId !== req.user.id) {
+        return res.status(403).json({ success: false, message: 'Forbidden: You can only update your own profile.' });
+      }
+
       const { displayName, username, mobile, bio, relationshipStatus, anniversaryDate, avatarUrl } = req.body;
 
-      await db.updateUserProfile(userId, {
+      await db.updateUserProfile(req.user.id, {
         display_name: displayName,
+        username,
+        mobile,
         avatar_url: avatarUrl,
         bio,
         relationship_status: relationshipStatus,
-        anniversary_date: anniversaryDate,
-        updated_at: new Date().toISOString()
+        anniversary_date: anniversaryDate || null
       });
 
-      return res.json({ success: true, message: 'Profile updated successfully.' });
+      const updated = await db.findUserById(req.user.id);
+      return res.json({
+        success: true,
+        message: 'Profile updated successfully.',
+        user: updated,
+        profile: updated?.user_profiles || null
+      });
     } catch (err) {
       return res.status(500).json({ success: false, message: err.message });
     }
@@ -50,11 +73,7 @@ export const userController = {
   // Get user contacts
   async getContacts(req, res) {
     try {
-      const userId = req.user?.id || req.query.userId;
-      if (!userId) {
-        return res.status(400).json({ success: false, message: 'User ID required' });
-      }
-      const contacts = await db.getContacts(userId);
+      const contacts = await db.getContacts(req.user.id);
       return res.json({ success: true, contacts });
     } catch (err) {
       return res.status(500).json({ success: false, message: err.message });
@@ -64,10 +83,10 @@ export const userController = {
   // Add contact
   async addContact(req, res) {
     try {
-      const { userId, contactUserId, nickname } = req.body;
-      const uid = req.user?.id || userId;
-      if (!uid || !contactUserId) {
-        return res.status(400).json({ success: false, message: 'User ID and contact user ID required' });
+      const { contactUserId, nickname } = req.body;
+      const uid = req.user.id;
+      if (!contactUserId) {
+        return res.status(400).json({ success: false, message: 'Contact user ID required' });
       }
       if (uid === contactUserId) {
         return res.status(400).json({ success: false, message: 'You cannot add yourself as a contact.' });
@@ -83,12 +102,8 @@ export const userController = {
   async updateContact(req, res) {
     try {
       const { contactUserId } = req.params;
-      const { nickname, userId } = req.body;
-      const uid = req.user?.id || userId || req.query.userId;
-      if (!uid || !contactUserId) {
-        return res.status(400).json({ success: false, message: 'User ID and contact user ID required' });
-      }
-      await db.updateContact(uid, contactUserId, nickname);
+      const { nickname } = req.body;
+      await db.updateContact(req.user.id, contactUserId, nickname);
       return res.json({ success: true, message: 'Contact nickname updated.' });
     } catch (err) {
       return res.status(500).json({ success: false, message: err.message });
@@ -99,11 +114,7 @@ export const userController = {
   async removeContact(req, res) {
     try {
       const { contactUserId } = req.params;
-      const userId = req.user?.id || req.body.userId || req.query.userId;
-      if (!userId || !contactUserId) {
-        return res.status(400).json({ success: false, message: 'User ID and contact user ID required' });
-      }
-      await db.removeContact(userId, contactUserId);
+      await db.removeContact(req.user.id, contactUserId);
       return res.json({ success: true, message: 'Contact removed.' });
     } catch (err) {
       return res.status(500).json({ success: false, message: err.message });
@@ -113,8 +124,7 @@ export const userController = {
   // Get blocked users
   async getBlockedUsers(req, res) {
     try {
-      const userId = req.user?.id || req.query.userId;
-      const blocked = await db.getBlockedUsers(userId);
+      const blocked = await db.getBlockedUsers(req.user.id);
       return res.json({ success: true, blocked });
     } catch (err) {
       return res.status(500).json({ success: false, message: err.message });
@@ -124,12 +134,11 @@ export const userController = {
   // Block user
   async blockUser(req, res) {
     try {
-      const { userId, blockedUserId } = req.body;
-      const uid = req.user?.id || userId;
-      if (!uid || !blockedUserId) {
-        return res.status(400).json({ success: false, message: 'User ID and blocked user ID required' });
+      const { blockedUserId } = req.body;
+      if (!blockedUserId) {
+        return res.status(400).json({ success: false, message: 'Blocked user ID required' });
       }
-      await db.blockUser(uid, blockedUserId);
+      await db.blockUser(req.user.id, blockedUserId);
       return res.json({ success: true, message: 'User has been blocked.' });
     } catch (err) {
       return res.status(500).json({ success: false, message: err.message });
@@ -139,12 +148,11 @@ export const userController = {
   // Unblock user
   async unblockUser(req, res) {
     try {
-      const { userId, blockedUserId } = req.body;
-      const uid = req.user?.id || userId;
-      if (!uid || !blockedUserId) {
-        return res.status(400).json({ success: false, message: 'User ID and blocked user ID required' });
+      const { blockedUserId } = req.body;
+      if (!blockedUserId) {
+        return res.status(400).json({ success: false, message: 'Blocked user ID required' });
       }
-      await db.unblockUser(uid, blockedUserId);
+      await db.unblockUser(req.user.id, blockedUserId);
       return res.json({ success: true, message: 'User has been unblocked.' });
     } catch (err) {
       return res.status(500).json({ success: false, message: err.message });
@@ -154,12 +162,11 @@ export const userController = {
   // E2EE Public Key Management
   async savePublicKey(req, res) {
     try {
-      const { userId, publicKey } = req.body;
-      const uid = req.user?.id || userId;
-      if (!uid || !publicKey) {
-        return res.status(400).json({ success: false, message: 'User ID and public key required' });
+      const { publicKey } = req.body;
+      if (!publicKey) {
+        return res.status(400).json({ success: false, message: 'Public key required' });
       }
-      await db.savePublicKey(uid, publicKey);
+      await db.savePublicKey(req.user.id, publicKey);
       return res.json({ success: true, message: 'Public key published successfully.' });
     } catch (err) {
       return res.status(500).json({ success: false, message: err.message });

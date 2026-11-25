@@ -3,6 +3,22 @@ import config from '../config/env.js';
 import otpService from '../services/otpService.js';
 import db from '../repositories/databaseRepository.js';
 
+function signSessionJwt(user) {
+  if (!config.jwtSecret) {
+    throw new Error('JWT_SECRET is not configured on the server.');
+  }
+  return jwt.sign(
+    {
+      id: user.id,
+      firebaseUid: user.firebase_uid || null,
+      email: user.email,
+      username: user.username
+    },
+    config.jwtSecret,
+    { expiresIn: '30d', algorithm: 'HS256' }
+  );
+}
+
 export const authController = {
   // Resolve Username or Mobile Number to registered Email
   async resolveIdentifier(req, res) {
@@ -28,31 +44,10 @@ export const authController = {
   async checkAvailability(req, res) {
     try {
       const { username, mobile, email } = req.body;
-      if (email) {
-        const existingEmail = await db.findUserByIdentifier(email);
-        if (existingEmail) {
-          return res.json({
-            available: false,
-            field: 'email',
-            code: 'EMAIL_ALREADY_IN_USE',
-            message: 'An account with this email address already exists. Please sign in or reset your password.'
-          });
-        }
-      }
-      if (username) {
-        const existingUser = await db.findUserByIdentifier(username);
-        if (existingUser) {
-          return res.json({ available: false, field: 'username', message: 'Username is already taken.' });
-        }
-      }
-      if (mobile) {
-        const existingMobile = await db.findUserByIdentifier(mobile);
-        if (existingMobile) {
-          return res.json({ available: false, field: 'mobile', message: 'Mobile number is already registered.' });
-        }
-      }
-      return res.json({ available: true });
+      const result = await db.checkAvailability({ username, mobile, email });
+      return res.json(result);
     } catch (err) {
+      console.error('Availability check error:', err);
       return res.status(500).json({ available: false, message: err.message });
     }
   },
@@ -61,25 +56,26 @@ export const authController = {
   async sendOtp(req, res) {
     try {
       const { email, identifier, purpose } = req.body;
-      let targetEmail = email;
+      let targetEmail = email ? email.trim().toLowerCase() : null;
 
-      // If identifier passed instead of direct email, resolve it
       if (!targetEmail && identifier) {
         const user = await db.findUserByIdentifier(identifier);
         if (user) {
           targetEmail = user.email;
         } else if (identifier.includes('@')) {
-          targetEmail = identifier;
+          targetEmail = identifier.trim().toLowerCase();
         }
       }
 
       if (!targetEmail) {
-        return res.status(400).json({ success: false, message: 'Valid email address or registered account identifier is required.' });
+        return res.status(400).json({
+          success: false,
+          message: 'Valid email address or registered account identifier is required.'
+        });
       }
 
-      // If purpose is signup, verify email is not already registered before sending OTP
       if (purpose === 'signup') {
-        const existing = await db.findUserByIdentifier(targetEmail);
+        const existing = await db.findUserByEmail(targetEmail);
         if (existing) {
           return res.status(400).json({
             success: false,
@@ -101,14 +97,14 @@ export const authController = {
   async verifyOtp(req, res) {
     try {
       const { email, identifier, otp, purpose } = req.body;
-      let targetEmail = email;
+      let targetEmail = email ? email.trim().toLowerCase() : null;
 
       if (!targetEmail && identifier) {
         const user = await db.findUserByIdentifier(identifier);
         if (user) {
           targetEmail = user.email;
         } else if (identifier.includes('@')) {
-          targetEmail = identifier;
+          targetEmail = identifier.trim().toLowerCase();
         }
       }
 
@@ -142,13 +138,7 @@ export const authController = {
         return res.status(400).json(otpResult);
       }
 
-      // Generate signed JWT token
-      const token = jwt.sign(
-        { id: user.id, email: user.email, username: user.username },
-        config.jwtSecret,
-        { expiresIn: '30d' }
-      );
-
+      const token = signSessionJwt(user);
       return res.json({
         success: true,
         token,
@@ -161,66 +151,56 @@ export const authController = {
     }
   },
 
-  // Sync / Initialize User in Supabase & Local Database
+  // Sync / Initialize Verified Firebase User in Supabase PostgreSQL
+  // Protected by requireFirebaseToken: req.firebaseUser is cryptographically verified.
   async syncUser(req, res) {
     try {
-      const { firebaseUid, email, displayName, username, mobile_number, photoURL, email_verified } = req.body;
-      if (!email) {
-        return res.status(400).json({ success: false, message: 'Email is required.' });
-      }
-
-      // Check if user already exists
-      const existing = await db.findUserByIdentifier(email);
-      if (existing) {
-        const token = jwt.sign(
-          { id: existing.id, email: existing.email, username: existing.username },
-          config.jwtSecret,
-          { expiresIn: '30d' }
-        );
-        return res.json({ 
-          success: true, 
-          token, 
-          user: existing, 
-          profile: existing.user_profiles 
+      const verified = req.firebaseUser;
+      if (!verified?.uid || !verified?.email) {
+        return res.status(400).json({
+          success: false,
+          message: 'Verified Firebase token must include UID and email.'
         });
       }
 
-      // Create new user & profile
-      const userData = {
-        firebase_uid: firebaseUid,
-        email: email.toLowerCase().trim(),
-        username: username || email.split('@')[0],
-        mobile_number: mobile_number || null,
-        email_verified: email_verified || false
-      };
+      const { displayName, username, mobile_number, photoURL } = req.body || {};
 
-      const profileData = {
-        display_name: displayName || email.split('@')[0],
-        avatar_url: photoURL || `https://api.dicebear.com/7.x/adventurer/svg?seed=${firebaseUid || email}`,
-        bio: 'In a love story written by the stars ✨',
-        relationship_status: 'In a soul bond'
-      };
+      const result = await db.syncFirebaseUser({
+        firebaseUid: verified.uid,
+        email: verified.email,
+        emailVerified: verified.emailVerified,
+        displayName: displayName || verified.name,
+        username: username || null,
+        mobileNumber: mobile_number || verified.phoneNumber || null,
+        photoURL: photoURL || verified.picture || null
+      });
 
-      const result = await db.createUser(userData, profileData);
-      const token = jwt.sign(
-        { id: result.user.id, email: result.user.email, username: result.user.username },
-        config.jwtSecret,
-        { expiresIn: '30d' }
-      );
+      const token = signSessionJwt(result.user);
 
-      return res.json({ success: true, token, ...result });
+      return res.json({
+        success: true,
+        token,
+        user: result.user,
+        profile: result.profile
+      });
     } catch (err) {
       console.error('Sync user error:', err);
-      return res.status(500).json({ success: false, message: 'Error initializing user account.' });
+      const status =
+        err.code === 'USERNAME_TAKEN' || err.code === 'FIREBASE_UID_MISMATCH' ? 409 : 500;
+      return res.status(status).json({
+        success: false,
+        code: err.code || 'SYNC_FAILED',
+        message: err.message || 'Error synchronizing user account with Supabase.'
+      });
     }
   },
 
-  // Reset password after OTP verification
+  // Reset password verification notice (Firebase password updates happen via Firebase reset email)
   async resetPassword(req, res) {
     try {
-      const { identifier, otp, newPassword } = req.body;
-      if (!identifier || !otp || !newPassword) {
-        return res.status(400).json({ success: false, message: 'Identifier, OTP, and new password are required.' });
+      const { identifier, otp } = req.body;
+      if (!identifier || !otp) {
+        return res.status(400).json({ success: false, message: 'Identifier and OTP are required.' });
       }
 
       const user = await db.findUserByIdentifier(identifier);
@@ -233,7 +213,11 @@ export const authController = {
         return res.status(400).json(otpResult);
       }
 
-      return res.json({ success: true, message: 'Password security credentials verified and updated.' });
+      return res.json({
+        success: true,
+        email: user.email,
+        message: 'OTP verified. A Firebase password reset link can now be dispatched to your email.'
+      });
     } catch (err) {
       return res.status(500).json({ success: false, message: err.message });
     }
@@ -242,10 +226,11 @@ export const authController = {
   // Record Terms of Service Acceptance
   async recordTermsAcceptance(req, res) {
     try {
-      const { termsVersion, privacyVersion, timestamp } = req.body;
+      const { termsVersion, privacyVersion, timestamp } = req.body || {};
       await db.recordTermsAcceptance({
-        terms_version: termsVersion || '1.0.0',
-        privacy_version: privacyVersion || '1.0.0',
+        user_id: req.user?.id || null,
+        terms_version: termsVersion || 'v1.0.0',
+        privacy_version: privacyVersion || 'v1.0.0',
         accepted_at: timestamp || new Date().toISOString(),
         ip_address: req.ip
       });

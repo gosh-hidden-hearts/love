@@ -11,13 +11,15 @@ export const transporter = nodemailer.createTransport({
   }
 });
 
-// Verify connection on startup
-transporter.verify((err, success) => {
-  if (err) {
-    console.warn('⚠️ Google SMTP Warning:', err.message);
-  } else {
-    console.log('💌 Google SMTP Server Ready to dispatch OTPs.');
-  }
-});
+// Verify connection on startup (skip in automated test mode)
+if (config.nodeEnv !== 'test') {
+  transporter.verify((err, success) => {
+    if (err) {
+      console.warn('⚠️ Google SMTP Warning:', err.message);
+    } else {
+      console.log('💌 Google SMTP Server Ready to dispatch OTPs.');
+    }
+  });
+}
 
 export default transporter;

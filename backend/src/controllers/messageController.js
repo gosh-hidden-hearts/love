@@ -2,21 +2,18 @@ import db from '../repositories/databaseRepository.js';
 import megaStorageService from '../services/megaStorageService.js';
 
 export const messageController = {
-  // Retrieve conversation messages
+  // Retrieve conversation messages (membership strictly enforced)
   async getMessages(req, res) {
     try {
       const { conversationId } = req.params;
-      const requestingUserId = req.user?.id || req.query.userId;
+      const requestingUserId = req.user.id;
 
-      // Privacy check: Only conversation members can read messages
-      if (requestingUserId && conversationId && !conversationId.startsWith('partner-demo') && !conversationId.startsWith('conv-default')) {
-        const isMember = await db.isConversationMember(requestingUserId, conversationId);
-        if (!isMember) {
-          return res.status(403).json({
-            success: false,
-            message: 'Unauthorized: You are not a member of this conversation.'
-          });
-        }
+      const isMember = await db.isConversationMember(requestingUserId, conversationId);
+      if (!isMember) {
+        return res.status(403).json({
+          success: false,
+          message: 'Unauthorized: You are not a member of this conversation.'
+        });
       }
 
       const messages = await db.getMessages(conversationId);
@@ -26,55 +23,72 @@ export const messageController = {
     }
   },
 
-  // Save new message with contact-only enforcement
+  // Save new message with membership & contact-only enforcement
   async sendMessage(req, res) {
     try {
-      const msg = req.body;
-      const actualSenderId = req.user?.id || msg.senderId;
-
-      if (!actualSenderId) {
-        return res.status(401).json({ success: false, message: 'Unauthorized: Sender identity required.' });
-      }
-
-      // Prevent spoofing sender ID
+      const msg = { ...req.body };
+      const actualSenderId = req.user.id;
       msg.senderId = actualSenderId;
 
-      // Identify the recipient
-      let recipientId = msg.targetUserId;
-      let conv = null;
-
-      if (msg.conversationId) {
-        conv = await db.getConversationById(msg.conversationId);
-      }
-
-      if (!recipientId && conv && !conv.isGroup) {
-        if (Array.isArray(conv.members)) {
-          recipientId = conv.members.find((m) => m !== actualSenderId) || conv.partnerId;
+      if (!msg.conversationId && msg.targetUserId) {
+        const directConv = await db.findDirectConversationBetween(actualSenderId, msg.targetUserId);
+        if (directConv) {
+          msg.conversationId = directConv.id;
         } else {
-          recipientId = conv.partnerId === actualSenderId ? conv.creatorId : conv.partnerId;
+          const isContact = await db.isContact(actualSenderId, msg.targetUserId);
+          if (!isContact) {
+            return res.status(403).json({
+              success: false,
+              code: 'NOT_A_CONTACT',
+              message: 'Messaging restricted: You can only send messages to users who are saved in your contacts.'
+            });
+          }
+          const created = await db.createConversation({
+            type: 'direct',
+            creatorId: actualSenderId,
+            partnerId: msg.targetUserId,
+            members: [actualSenderId, msg.targetUserId]
+          });
+          msg.conversationId = created.id;
         }
       }
 
-      // Contact-only restriction for 1-to-1 conversations
-      if (recipientId && recipientId !== actualSenderId && (!conv || !conv.isGroup)) {
-        const isAllowed = await db.isContact(actualSenderId, recipientId);
-        if (!isAllowed) {
-          return res.status(403).json({
-            success: false,
-            code: 'NOT_A_CONTACT',
-            message: 'Messaging restricted: You can only send messages to users who are saved in your contacts.'
-          });
-        }
+      if (!msg.conversationId) {
+        return res.status(400).json({ success: false, message: 'conversationId is required.' });
       }
 
-      // Verify conversation membership
-      if (conv && conv.id && !conv.id.startsWith('conv-default') && !conv.id.startsWith('partner-demo')) {
-        const isMember = await db.isConversationMember(actualSenderId, conv.id);
-        if (!isMember) {
-          return res.status(403).json({
-            success: false,
-            message: 'Unauthorized: You are not a member of this conversation.'
-          });
+      const conv = await db.getConversationById(msg.conversationId, actualSenderId);
+      if (!conv) {
+        return res.status(404).json({ success: false, message: 'Conversation not found.' });
+      }
+
+      const isMember = await db.isConversationMember(actualSenderId, conv.id);
+      if (!isMember) {
+        return res.status(403).json({
+          success: false,
+          message: 'Unauthorized: You are not a member of this conversation.'
+        });
+      }
+
+      if (!conv.isGroup) {
+        const recipientId = conv.members.find((m) => m !== actualSenderId) || msg.targetUserId;
+        if (recipientId && recipientId !== actualSenderId) {
+          const blocked = await db.isUserBlocked(actualSenderId, recipientId);
+          if (blocked) {
+            return res.status(403).json({
+              success: false,
+              code: 'USER_BLOCKED',
+              message: 'Messaging unavailable: User is blocked.'
+            });
+          }
+          const isAllowed = await db.isContact(actualSenderId, recipientId);
+          if (!isAllowed) {
+            return res.status(403).json({
+              success: false,
+              code: 'NOT_A_CONTACT',
+              message: 'Messaging restricted: You can only send messages to users who are saved in your contacts.'
+            });
+          }
         }
       }
 
@@ -98,7 +112,6 @@ export const messageController = {
       else if (file.mimetype.startsWith('video/')) messageType = 'video';
       else if (file.mimetype.startsWith('audio/')) messageType = 'audio';
 
-      // Upload directly to MEGA under 'GOSH_Chat_Attachments' folder
       let megaResult = null;
       try {
         megaResult = await megaStorageService.uploadFile(
@@ -140,20 +153,20 @@ export const messageController = {
   async reactToMessage(req, res) {
     try {
       const { messageId } = req.params;
-      const { reaction, userId } = req.body;
-      await db.reactToMessage(messageId, userId, reaction);
+      const { reaction } = req.body;
+      await db.reactToMessage(messageId, req.user.id, reaction);
       return res.json({ success: true, messageId, reaction });
     } catch (err) {
       return res.status(500).json({ success: false, message: err.message });
     }
   },
 
-  // Delete message
+  // Delete own message
   async deleteMessage(req, res) {
     try {
       const { messageId } = req.params;
-      const { deleteForEveryone } = req.body;
-      await db.deleteMessage(messageId, Boolean(deleteForEveryone));
+      const { deleteForEveryone } = req.body || {};
+      await db.deleteMessage(messageId, req.user.id, Boolean(deleteForEveryone));
       return res.json({ success: true, messageId });
     } catch (err) {
       return res.status(500).json({ success: false, message: err.message });

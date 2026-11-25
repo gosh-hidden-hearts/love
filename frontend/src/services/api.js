@@ -1,13 +1,12 @@
+import { auth } from './firebase';
+
 /**
  * GOSH Hidden Hearts - API Service Client
- * Features:
- * - Robust safeRequest wrapper preventing "Unexpected end of JSON input" and "Unexpected token '<'"
- * - Automatic Content-Type and Authorization header management
- * - Handles empty responses (204 No Content, Content-Length: 0) and non-JSON HTML (404/405 static errors)
- * - Resolves production backend URL from VITE_API_URL / VITE_API_BASE
+ * - Resolves backend URL from VITE_API_URL / VITE_API_BASE or localStorage override
+ * - Attaches verified backend JWT or fresh Firebase ID token in Authorization header
+ * - Never masks GitHub Pages static 404s as successful API calls
  */
 
-// Resolves the backend API base URL with custom user override & environment variable support
 export const getApiBase = () => {
   const customOverride = typeof localStorage !== 'undefined' ? localStorage.getItem('gosh_backend_url') : null;
   const envUrl = customOverride || import.meta.env.VITE_API_BASE || import.meta.env.VITE_API_URL;
@@ -15,14 +14,15 @@ export const getApiBase = () => {
     const clean = envUrl.trim().replace(/\/+$/, '');
     return clean.endsWith('/api') ? clean : `${clean}/api`;
   }
-  // In local browser dev, Vite proxies /api to port 5000
   if (typeof window !== 'undefined') {
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
       return '/api';
     }
   }
-  return '/api';
+  return null;
 };
+
+export const isBackendConfigured = () => Boolean(getApiBase());
 
 export const setCustomBackendUrl = (url) => {
   if (typeof localStorage !== 'undefined') {
@@ -40,40 +40,51 @@ export const getCustomBackendUrl = () => {
   return typeof localStorage !== 'undefined' ? localStorage.getItem('gosh_backend_url') || '' : '';
 };
 
-// Resolves a relative or stream file URL to a fully-qualified backend URL in production (e.g. for GitHub Pages)
 export const resolveFileUrl = (url) => {
   if (!url) return '';
   if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
     return url;
   }
   const apiBase = getApiBase();
-  if (apiBase === '/api') {
+  if (!apiBase || apiBase === '/api') {
     return url;
   }
   const origin = apiBase.replace(/\/api\/?$/, '');
   return `${origin}${url.startsWith('/') ? '' : '/'}${url}`;
 };
 
-export const API_BASE = getApiBase();
+export const API_BASE = getApiBase() || '/api';
 
-function getAuthHeaders(extra = {}) {
-  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('gosh_jwt_token') : null;
+async function getAuthHeaders(extra = {}, includeJsonContentType = true) {
+  let token = typeof localStorage !== 'undefined' ? localStorage.getItem('gosh_jwt_token') : null;
+
+  if (!token && auth?.currentUser) {
+    try {
+      token = await auth.currentUser.getIdToken();
+    } catch {
+      token = null;
+    }
+  }
+
   return {
-    'Content-Type': 'application/json',
-    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...(includeJsonContentType ? { 'Content-Type': 'application/json' } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...extra
   };
 }
 
-/**
- * Robust fetch wrapper:
- * 1. Safely reads response as text first.
- * 2. Never calls res.json() on empty responses (prevents "Unexpected end of JSON input").
- * 3. Never calls res.json() on HTML/404 pages (prevents "Unexpected token '<'").
- * 4. Catches network disconnections and offline errors gracefully without throwing unhandled exceptions.
- */
 async function safeRequest(endpoint, options = {}, defaultData = {}) {
   const currentBase = getApiBase();
+  if (!currentBase && !endpoint.startsWith('http')) {
+    return {
+      success: false,
+      offline: true,
+      backendNotConfigured: true,
+      message: 'Backend server URL is not configured (VITE_API_URL). Please connect your Render backend URL in Settings or GitHub Secrets.',
+      ...defaultData
+    };
+  }
+
   const fullUrl = endpoint.startsWith('http')
     ? endpoint
     : `${currentBase}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
@@ -100,10 +111,11 @@ async function safeRequest(endpoint, options = {}, defaultData = {}) {
         const json = JSON.parse(text);
         return {
           ...defaultData,
+          success: json.success !== undefined ? json.success : res.ok,
+          status: res.status,
           ...json
         };
       } catch (parseErr) {
-        console.warn(`JSON parse error from ${fullUrl}:`, parseErr.message);
         return {
           success: false,
           status: res.status,
@@ -114,13 +126,12 @@ async function safeRequest(endpoint, options = {}, defaultData = {}) {
       }
     }
 
-    // Response is HTML (e.g. 404 from GitHub Pages) or other non-JSON text
     return {
       success: false,
       status: res.status,
       error: `Non-JSON response (${res.status})`,
       message: res.status === 404
-        ? 'Backend API not reachable at this address. Please verify your backend server deployment.'
+        ? 'Backend API not reachable at this address. Please verify your Render backend deployment.'
         : `Server returned non-JSON response (${res.status})`,
       isHtml: contentType.includes('text/html'),
       ...defaultData
@@ -130,7 +141,7 @@ async function safeRequest(endpoint, options = {}, defaultData = {}) {
     return {
       success: false,
       error: netErr.message || 'Network request failed',
-      message: 'Unable to connect to the backend server. Please verify your internet connection or backend server status.',
+      message: 'Unable to connect to the backend server. Please verify your internet connection or Render backend status.',
       offline: true,
       ...defaultData
     };
@@ -142,7 +153,7 @@ export const api = {
   async recordTermsAcceptance(termsVersion = '1.0.0', privacyVersion = '1.0.0') {
     return safeRequest('/auth/terms-accept', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getAuthHeaders(),
       body: JSON.stringify({ termsVersion, privacyVersion, timestamp: new Date().toISOString() })
     });
   },
@@ -196,21 +207,27 @@ export const api = {
     return data;
   },
 
-  // Password Reset with OTP
-  async resetPasswordWithOtp(identifier, otp, newPassword) {
+  // Password Reset OTP Verification
+  async resetPasswordWithOtp(identifier, otp) {
     return safeRequest('/auth/reset-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifier, otp, newPassword })
+      body: JSON.stringify({ identifier, otp })
     });
   },
 
-  // Sync / Initialize User in Backend
-  async syncUser(userData) {
+  // Sync / Initialize Verified Firebase User in Supabase via Backend
+  async syncUser(firebaseIdToken, profileMetadata = {}) {
+    if (!firebaseIdToken) {
+      return { success: false, message: 'Firebase ID token is required to sync user.' };
+    }
     const data = await safeRequest('/auth/sync-user', {
       method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(userData)
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${firebaseIdToken}`
+      },
+      body: JSON.stringify(profileMetadata)
     });
     if (data?.token && typeof localStorage !== 'undefined') {
       localStorage.setItem('gosh_jwt_token', data.token);
@@ -222,49 +239,48 @@ export const api = {
   async searchUsers(query) {
     return safeRequest(
       `/users/search?q=${encodeURIComponent(query || '')}`,
-      { headers: getAuthHeaders() },
+      { headers: await getAuthHeaders() },
       { users: [] }
     );
   },
 
   // Contact Management
-  async getContacts(userId) {
+  async getContacts() {
     return safeRequest(
-      `/users/contacts?userId=${userId || ''}`,
-      { headers: getAuthHeaders() },
+      '/users/contacts',
+      { headers: await getAuthHeaders() },
       { contacts: [] }
     );
   },
 
-  async addContact(contactUserId, nickname = null, userId = null) {
+  async addContact(contactUserId, nickname = null) {
     return safeRequest('/users/contacts', {
       method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ contactUserId, nickname, userId })
+      headers: await getAuthHeaders(),
+      body: JSON.stringify({ contactUserId, nickname })
     });
   },
 
-  async updateContact(contactUserId, nickname, userId = null) {
+  async updateContact(contactUserId, nickname) {
     return safeRequest(`/users/contacts/${contactUserId}`, {
       method: 'PUT',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ nickname, userId })
+      headers: await getAuthHeaders(),
+      body: JSON.stringify({ nickname })
     });
   },
 
-  async removeContact(contactUserId, userId = null) {
+  async removeContact(contactUserId) {
     return safeRequest(`/users/contacts/${contactUserId}`, {
       method: 'DELETE',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ userId })
+      headers: await getAuthHeaders()
     });
   },
 
   // Blocked Users
-  async getBlockedUsers(userId) {
+  async getBlockedUsers() {
     return safeRequest(
-      `/users/blocked?userId=${userId || ''}`,
-      { headers: getAuthHeaders() },
+      '/users/blocked',
+      { headers: await getAuthHeaders() },
       { blockedUsers: [] }
     );
   },
@@ -272,7 +288,7 @@ export const api = {
   async blockUser(blockedUserId) {
     return safeRequest('/users/block', {
       method: 'POST',
-      headers: getAuthHeaders(),
+      headers: await getAuthHeaders(),
       body: JSON.stringify({ blockedUserId })
     });
   },
@@ -280,7 +296,7 @@ export const api = {
   async unblockUser(blockedUserId) {
     return safeRequest('/users/unblock', {
       method: 'POST',
-      headers: getAuthHeaders(),
+      headers: await getAuthHeaders(),
       body: JSON.stringify({ blockedUserId })
     });
   },
@@ -289,7 +305,7 @@ export const api = {
   async getProfile(userId) {
     return safeRequest(
       `/users/profile/${userId}`,
-      { headers: getAuthHeaders() },
+      { headers: await getAuthHeaders() },
       { profile: null }
     );
   },
@@ -297,16 +313,16 @@ export const api = {
   async updateProfile(userId, profileData) {
     return safeRequest(`/users/profile/${userId}`, {
       method: 'PUT',
-      headers: getAuthHeaders(),
+      headers: await getAuthHeaders(),
       body: JSON.stringify(profileData)
     });
   },
 
   // Conversations & Messages
-  async getConversations(userId) {
+  async getConversations() {
     return safeRequest(
-      `/conversations?userId=${userId || ''}`,
-      { headers: getAuthHeaders() },
+      '/conversations',
+      { headers: await getAuthHeaders() },
       { conversations: [] }
     );
   },
@@ -314,7 +330,7 @@ export const api = {
   async createConversation(data) {
     return safeRequest('/conversations', {
       method: 'POST',
-      headers: getAuthHeaders(),
+      headers: await getAuthHeaders(),
       body: JSON.stringify(data)
     });
   },
@@ -322,7 +338,7 @@ export const api = {
   async createGroup(groupData) {
     return safeRequest('/conversations/group', {
       method: 'POST',
-      headers: getAuthHeaders(),
+      headers: await getAuthHeaders(),
       body: JSON.stringify(groupData)
     });
   },
@@ -330,7 +346,7 @@ export const api = {
   async getMessages(conversationId) {
     return safeRequest(
       `/messages/${conversationId}`,
-      { headers: getAuthHeaders() },
+      { headers: await getAuthHeaders() },
       { messages: [] }
     );
   },
@@ -338,18 +354,15 @@ export const api = {
   async sendMessage(data) {
     return safeRequest('/messages', {
       method: 'POST',
-      headers: getAuthHeaders(),
+      headers: await getAuthHeaders(),
       body: JSON.stringify(data)
     });
   },
 
-  // Upload message attachment (images, audio, video, docs)
   async uploadAttachment(formData) {
-    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('gosh_jwt_token') : null;
-    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
     return safeRequest('/messages/upload', {
       method: 'POST',
-      headers,
+      headers: await getAuthHeaders({}, false),
       body: formData
     });
   },
@@ -357,7 +370,7 @@ export const api = {
   async deleteMessage(messageId, userId, deleteForEveryone = false) {
     return safeRequest(`/messages/${messageId}`, {
       method: 'DELETE',
-      headers: getAuthHeaders(),
+      headers: await getAuthHeaders(),
       body: JSON.stringify({ userId, deleteForEveryone })
     });
   },
@@ -365,26 +378,24 @@ export const api = {
   async reactToMessage(messageId, userId, reaction) {
     return safeRequest(`/messages/${messageId}/reaction`, {
       method: 'POST',
-      headers: getAuthHeaders(),
+      headers: await getAuthHeaders(),
       body: JSON.stringify({ userId, reaction })
     });
   },
 
   // Status / Stories
-  async getStatuses(userId) {
+  async getStatuses() {
     return safeRequest(
-      `/statuses?userId=${userId || ''}`,
-      { headers: getAuthHeaders() },
+      '/statuses',
+      { headers: await getAuthHeaders() },
       { statuses: [], myStatuses: [] }
     );
   },
 
   async createStatus(formData) {
-    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('gosh_jwt_token') : null;
-    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
     return safeRequest('/statuses', {
       method: 'POST',
-      headers,
+      headers: await getAuthHeaders({}, false),
       body: formData
     });
   },
@@ -392,7 +403,7 @@ export const api = {
   async markStatusViewed(statusId, viewerId, viewerName) {
     return safeRequest(`/statuses/${statusId}/view`, {
       method: 'POST',
-      headers: getAuthHeaders(),
+      headers: await getAuthHeaders(),
       body: JSON.stringify({ viewerId, viewerName })
     });
   },
@@ -400,15 +411,15 @@ export const api = {
   async deleteStatus(statusId) {
     return safeRequest(`/statuses/${statusId}`, {
       method: 'DELETE',
-      headers: getAuthHeaders()
+      headers: await getAuthHeaders()
     });
   },
 
   // Calls
-  async getCallHistory(userId) {
+  async getCallHistory() {
     return safeRequest(
-      `/calls/history?userId=${userId || ''}`,
-      { headers: getAuthHeaders() },
+      '/calls/history',
+      { headers: await getAuthHeaders() },
       { calls: [] }
     );
   },
@@ -416,59 +427,56 @@ export const api = {
   async logCall(callData) {
     return safeRequest('/calls/log', {
       method: 'POST',
-      headers: getAuthHeaders(),
+      headers: await getAuthHeaders(),
       body: JSON.stringify(callData)
     });
   },
 
-  // Memory Vault (MEGA Cloud Storage)
-  async getMemories(spaceId = 'default') {
+  // Memory Vault
+  async getMemories() {
     return safeRequest(
-      `/memory-vault?spaceId=${spaceId}`,
-      { headers: getAuthHeaders() },
+      '/memory-vault',
+      { headers: await getAuthHeaders() },
       { memories: [] }
     );
   },
 
   async uploadMemory(formData) {
-    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('gosh_jwt_token') : null;
-    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
     return safeRequest('/memory-vault/upload', {
       method: 'POST',
-      headers,
+      headers: await getAuthHeaders({}, false),
       body: formData
     });
   },
 
-  async deleteMemory(memoryId, userId) {
+  async deleteMemory(memoryId) {
     return safeRequest(`/memory-vault/${memoryId}`, {
       method: 'DELETE',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ userId })
+      headers: await getAuthHeaders()
     });
   },
 
   // Settings & Passcode Vault
   async getSettings(userId) {
     return safeRequest(
-      `/settings/${userId || ''}`,
-      { headers: getAuthHeaders() },
+      `/settings/${userId || 'me'}`,
+      { headers: await getAuthHeaders() },
       { settings: null }
     );
   },
 
   async updateSettings(userId, settings) {
-    return safeRequest(`/settings/${userId}`, {
+    return safeRequest(`/settings/${userId || 'me'}`, {
       method: 'PUT',
-      headers: getAuthHeaders(),
+      headers: await getAuthHeaders(),
       body: JSON.stringify(settings)
     });
   },
 
   async verifyPasscode(userId, passcode) {
-    return safeRequest(`/settings/${userId}/verify-passcode`, {
+    return safeRequest(`/settings/${userId || 'me'}/verify-passcode`, {
       method: 'POST',
-      headers: getAuthHeaders(),
+      headers: await getAuthHeaders(),
       body: JSON.stringify({ passcode })
     });
   },
@@ -477,7 +485,7 @@ export const api = {
   async publishPublicKey(userId, publicKey) {
     return safeRequest('/users/public-key', {
       method: 'POST',
-      headers: getAuthHeaders(),
+      headers: await getAuthHeaders(),
       body: JSON.stringify({ userId, publicKey })
     });
   },
@@ -485,7 +493,7 @@ export const api = {
   async getPublicKey(userId) {
     return safeRequest(
       `/users/${userId}/public-key`,
-      { headers: getAuthHeaders() },
+      { headers: await getAuthHeaders() },
       { publicKey: null }
     );
   },

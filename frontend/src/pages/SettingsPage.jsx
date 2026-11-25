@@ -38,7 +38,7 @@ import logoImg from '../assets/logo.png';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
-  const { user, profile, logout, isVaultLocked, setIsVaultLocked } = useAuth();
+  const { user, profile, retryBackendSync, logout, isVaultLocked, setIsVaultLocked } = useAuth();
 
   // Settings State
   const [theme, setTheme] = useState('romantic-dark');
@@ -96,6 +96,7 @@ export default function SettingsPage() {
         setCustomBackendUrl(target);
         setBackendStatus({ ok: true, data, error: null });
         if (user) {
+          await retryBackendSync?.();
           socketService.connect(user);
         }
       } else {

@@ -1,422 +1,922 @@
-import fs from 'fs';
-import path from 'path';
 import crypto from 'crypto';
-import { fileURLToPath } from 'url';
 import supabase from '../config/supabase.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const DATA_DIR = path.join(__dirname, '../../data');
-const STORE_PATH = path.join(DATA_DIR, 'store.json');
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-// Ensure data directory exists for local fallback storage
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+export function isUuid(value) {
+  return typeof value === 'string' && UUID_REGEX.test(value.trim());
 }
 
-// Initial fallback store
-let fallbackStore = {
-  users: [],
-  profiles: [],
-  identifiers: [],
-  settings: [],
-  conversations: [],
-  messages: [],
-  statuses: [],
-  calls: [],
-  memories: [],
-  terms_acceptance: [],
-  otp_verifications: [],
-  contacts: [],
-  blocked_users: []
-};
+function normalizeProfileJoin(profileField) {
+  if (!profileField) return null;
+  return Array.isArray(profileField) ? profileField[0] || null : profileField;
+}
 
-// Load existing store if available
-if (fs.existsSync(STORE_PATH)) {
-  try {
-    const raw = fs.readFileSync(STORE_PATH, 'utf8');
-    fallbackStore = { ...fallbackStore, ...JSON.parse(raw) };
-  } catch (e) {
-    console.warn('Could not read store.json, using fresh store.');
+function assertNoError(error, context) {
+  if (error) {
+    const err = new Error(`${context}: ${error.message}`);
+    err.code = error.code;
+    err.details = error.details;
+    throw err;
   }
 }
 
-function persistFallback() {
-  try {
-    fs.writeFileSync(STORE_PATH, JSON.stringify(fallbackStore, null, 2), 'utf8');
-  } catch (err) {
-    console.error('Error writing fallback store:', err);
-  }
+function escapeIlike(str) {
+  return str.replace(/[\\%_]/g, '\\$&');
+}
+
+function sanitizeUsernameBase(raw) {
+  const cleaned = (raw || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  if (cleaned.length >= 3) return cleaned.slice(0, 40);
+  return `soul_${crypto.randomBytes(3).toString('hex')}`;
 }
 
 export const db = {
   // =========================================================================
-  // USERS & IDENTIFIERS
+  // USERS, PROFILES & IDENTIFIERS (Supabase PostgreSQL ONLY)
   // =========================================================================
+  async findUserById(userId) {
+    if (!isUuid(userId)) return null;
+    const { data, error } = await supabase
+      .from('users')
+      .select('*, user_profiles(*)')
+      .eq('id', userId)
+      .maybeSingle();
+
+    assertNoError(error, 'findUserById failed');
+    if (!data) return null;
+    return { ...data, user_profiles: normalizeProfileJoin(data.user_profiles) };
+  },
+
+  async findUserByFirebaseUid(firebaseUid) {
+    if (!firebaseUid) return null;
+    const { data, error } = await supabase
+      .from('users')
+      .select('*, user_profiles(*)')
+      .eq('firebase_uid', firebaseUid)
+      .maybeSingle();
+
+    assertNoError(error, 'findUserByFirebaseUid failed');
+    if (!data) return null;
+    return { ...data, user_profiles: normalizeProfileJoin(data.user_profiles) };
+  },
+
+  async findUserByEmail(email) {
+    if (!email) return null;
+    const normalized = email.trim().toLowerCase();
+    const { data, error } = await supabase
+      .from('users')
+      .select('*, user_profiles(*)')
+      .eq('email', normalized)
+      .maybeSingle();
+
+    assertNoError(error, 'findUserByEmail failed');
+    if (!data) return null;
+    return { ...data, user_profiles: normalizeProfileJoin(data.user_profiles) };
+  },
+
   async findUserByIdentifier(identifier) {
-    const trimmed = identifier.trim().toLowerCase();
+    if (!identifier || typeof identifier !== 'string') return null;
+    const rawTrimmed = identifier.trim();
+    const normalized = rawTrimmed.toLowerCase().replace(/^@/, '');
+    if (!normalized) return null;
 
-    // Try Supabase first
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*, user_profiles(*)')
-        .or(`email.eq.${trimmed},username.eq.${trimmed},mobile_number.eq.${trimmed}`)
-        .maybeSingle();
-
-      if (!error && data) {
-        return data;
-      }
-    } catch (e) {
-      // Supabase table not migrated or accessible, proceed to fallback
+    if (isUuid(rawTrimmed)) {
+      return this.findUserById(rawTrimmed);
     }
 
-    // Fallback store search
-    const user = fallbackStore.users.find(
-      (u) =>
-        u.email?.toLowerCase() === trimmed ||
-        u.username?.toLowerCase() === trimmed ||
-        u.mobile_number === trimmed
-    );
+    // 1. Fast lookup via user_identifiers
+    const { data: idRow, error: idError } = await supabase
+      .from('user_identifiers')
+      .select('user_id')
+      .eq('identifier_value', normalized)
+      .maybeSingle();
 
-    if (user) {
-      const profile = fallbackStore.profiles.find((p) => p.user_id === user.id);
-      return { ...user, user_profiles: profile };
+    assertNoError(idError, 'findUserByIdentifier(user_identifiers) failed');
+    if (idRow?.user_id) {
+      const found = await this.findUserById(idRow.user_id);
+      if (found) return found;
+    }
+
+    // 2. Direct lookup on users table using safe parameterized .eq() calls
+    if (normalized.includes('@')) {
+      return this.findUserByEmail(normalized);
+    }
+
+    const { data: byUsername, error: userErr } = await supabase
+      .from('users')
+      .select('*, user_profiles(*)')
+      .eq('username', normalized)
+      .maybeSingle();
+    assertNoError(userErr, 'findUserByIdentifier(username) failed');
+    if (byUsername) {
+      return { ...byUsername, user_profiles: normalizeProfileJoin(byUsername.user_profiles) };
+    }
+
+    const { data: byMobile, error: mobErr } = await supabase
+      .from('users')
+      .select('*, user_profiles(*)')
+      .eq('mobile_number', rawTrimmed)
+      .maybeSingle();
+    assertNoError(mobErr, 'findUserByIdentifier(mobile) failed');
+    if (byMobile) {
+      return { ...byMobile, user_profiles: normalizeProfileJoin(byMobile.user_profiles) };
     }
 
     return null;
   },
 
-  async createUser(userData, profileData) {
-    // 1. Try Supabase
-    try {
-      const { data: newUser, error } = await supabase
+  async checkAvailability({ email, username, mobile }) {
+    if (email) {
+      const existingEmail = await this.findUserByEmail(email);
+      if (existingEmail) {
+        return {
+          available: false,
+          field: 'email',
+          code: 'EMAIL_ALREADY_IN_USE',
+          message: 'An account with this email address already exists. Please sign in or reset your password.'
+        };
+      }
+    }
+
+    if (username) {
+      const cleanUser = username.trim().toLowerCase().replace(/^@/, '');
+      const { data: existingUsername, error } = await supabase
         .from('users')
-        .insert([userData])
+        .select('id')
+        .eq('username', cleanUser)
+        .maybeSingle();
+      assertNoError(error, 'checkAvailability(username) failed');
+      if (existingUsername) {
+        return { available: false, field: 'username', message: 'Username is already taken.' };
+      }
+    }
+
+    if (mobile) {
+      const cleanMobile = mobile.trim();
+      const { data: existingMobile, error } = await supabase
+        .from('users')
+        .select('id')
+        .eq('mobile_number', cleanMobile)
+        .maybeSingle();
+      assertNoError(error, 'checkAvailability(mobile) failed');
+      if (existingMobile) {
+        return { available: false, field: 'mobile', message: 'Mobile number is already registered.' };
+      }
+    }
+
+    return { available: true };
+  },
+
+  async syncUserIdentifiers(user) {
+    if (!user?.id) return;
+
+    const pairs = [];
+    if (user.email) {
+      pairs.push({
+        user_id: user.id,
+        identifier_type: 'email',
+        identifier_value: user.email.toLowerCase().trim(),
+        is_verified: Boolean(user.email_verified)
+      });
+    }
+    if (user.username) {
+      pairs.push({
+        user_id: user.id,
+        identifier_type: 'username',
+        identifier_value: user.username.toLowerCase().trim(),
+        is_verified: true
+      });
+    }
+    if (user.mobile_number) {
+      pairs.push({
+        user_id: user.id,
+        identifier_type: 'mobile',
+        identifier_value: user.mobile_number.trim(),
+        is_verified: false
+      });
+    }
+
+    for (const entry of pairs) {
+      // Remove stale identifier of same type owned by this user if value changed
+      await supabase
+        .from('user_identifiers')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('identifier_type', entry.identifier_type)
+        .neq('identifier_value', entry.identifier_value);
+
+      const { error } = await supabase
+        .from('user_identifiers')
+        .upsert([entry], { onConflict: 'identifier_type,identifier_value' });
+      assertNoError(error, `syncUserIdentifiers(${entry.identifier_type}) failed`);
+    }
+  },
+
+  async ensureUniqueUsername(desiredUsername, email) {
+    const base = sanitizeUsernameBase(desiredUsername || email?.split('@')[0]);
+    let candidate = base;
+
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id')
+        .eq('username', candidate)
+        .maybeSingle();
+      assertNoError(error, 'ensureUniqueUsername failed');
+      if (!data) return candidate;
+
+      // If caller explicitly supplied a custom username on signup and it collides, fail clearly
+      if (attempt === 0 && desiredUsername && desiredUsername.trim().toLowerCase() === base) {
+        const err = new Error('Username is already taken.');
+        err.code = 'USERNAME_TAKEN';
+        throw err;
+      }
+
+      const suffix = crypto.randomBytes(2).toString('hex');
+      candidate = `${base.slice(0, 40)}_${suffix}`;
+    }
+
+    return `${base.slice(0, 32)}_${Date.now().toString().slice(-6)}`;
+  },
+
+  /**
+   * Idempotent synchronization of an authenticated Firebase user into Supabase.
+   * Creates or links `users`, `user_profiles`, `user_settings`, and `user_identifiers`.
+   */
+  async syncFirebaseUser({
+    firebaseUid,
+    email,
+    emailVerified = false,
+    displayName,
+    username,
+    mobileNumber = null,
+    photoURL = null
+  }) {
+    if (!firebaseUid || !email) {
+      throw new Error('Verified firebaseUid and email are required for synchronization.');
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+    const cleanMobile = mobileNumber ? mobileNumber.trim() : null;
+
+    // 1. Locate existing user by firebase_uid first, then email
+    let userRow = await this.findUserByFirebaseUid(firebaseUid);
+    if (!userRow) {
+      userRow = await this.findUserByEmail(cleanEmail);
+      if (userRow) {
+        if (userRow.firebase_uid && userRow.firebase_uid !== firebaseUid) {
+          const conflictErr = new Error('This email is already linked to a different Firebase identity.');
+          conflictErr.code = 'FIREBASE_UID_MISMATCH';
+          throw conflictErr;
+        }
+        // Link firebase_uid to existing user record
+        const { data: updatedUser, error: linkErr } = await supabase
+          .from('users')
+          .update({
+            firebase_uid: firebaseUid,
+            email_verified: Boolean(emailVerified || userRow.email_verified),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', userRow.id)
+          .select()
+          .single();
+        assertNoError(linkErr, 'syncFirebaseUser(link firebase_uid) failed');
+        userRow = { ...updatedUser, user_profiles: userRow.user_profiles };
+      }
+    }
+
+    // 2. Create user if not found
+    if (!userRow) {
+      const uniqueUsername = await this.ensureUniqueUsername(username, cleanEmail);
+      const newUserId = crypto.randomUUID();
+
+      const { data: insertedUser, error: insertErr } = await supabase
+        .from('users')
+        .insert([{
+          id: newUserId,
+          firebase_uid: firebaseUid,
+          email: cleanEmail,
+          email_verified: Boolean(emailVerified),
+          username: uniqueUsername,
+          mobile_number: cleanMobile,
+          status: 'active'
+        }])
         .select()
         .single();
 
-      if (!error && newUser) {
-        await supabase
-          .from('user_profiles')
-          .insert([{ user_id: newUser.id, ...profileData }]);
-        return { user: newUser, profile: profileData };
-      }
-    } catch (e) {
-      // Supabase fallback
+      assertNoError(insertErr, 'syncFirebaseUser(insert users) failed');
+      userRow = insertedUser;
+    } else if (emailVerified && !userRow.email_verified) {
+      const { data: verifiedUser, error: verErr } = await supabase
+        .from('users')
+        .update({ email_verified: true, updated_at: new Date().toISOString() })
+        .eq('id', userRow.id)
+        .select()
+        .single();
+      assertNoError(verErr, 'syncFirebaseUser(update email_verified) failed');
+      userRow = { ...verifiedUser, user_profiles: userRow.user_profiles };
     }
 
-    // 2. Fallback local store
-    const userId = userData.id || 'usr-' + Date.now();
-    const fullUser = { id: userId, ...userData, created_at: new Date().toISOString() };
-    const fullProfile = { user_id: userId, ...profileData, created_at: new Date().toISOString() };
+    // 3. Ensure user_profiles exists / restore if missing
+    let profileRow = normalizeProfileJoin(userRow.user_profiles);
+    if (!profileRow) {
+      const { data: existingProfile, error: profFetchErr } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', userRow.id)
+        .maybeSingle();
+      assertNoError(profFetchErr, 'syncFirebaseUser(fetch profile) failed');
+      profileRow = existingProfile;
+    }
 
-    // Remove old if exists
-    fallbackStore.users = fallbackStore.users.filter((u) => u.email !== userData.email);
-    fallbackStore.profiles = fallbackStore.profiles.filter((p) => p.user_id !== userId);
+    const defaultAvatar =
+      photoURL || `https://api.dicebear.com/7.x/adventurer/svg?seed=${firebaseUid}`;
+    const resolvedDisplayName =
+      displayName?.trim() || userRow.username || cleanEmail.split('@')[0];
 
-    fallbackStore.users.push(fullUser);
-    fallbackStore.profiles.push(fullProfile);
-    persistFallback();
+    if (!profileRow) {
+      const { data: insertedProfile, error: profInsertErr } = await supabase
+        .from('user_profiles')
+        .insert([{
+          user_id: userRow.id,
+          display_name: resolvedDisplayName,
+          avatar_url: defaultAvatar,
+          bio: 'In a love story written by the stars ✨',
+          relationship_status: 'In a soul bond'
+        }])
+        .select()
+        .single();
+      assertNoError(profInsertErr, 'syncFirebaseUser(insert user_profiles) failed');
+      profileRow = insertedProfile;
+    }
 
-    return { user: fullUser, profile: fullProfile };
+    // 4. Ensure user_settings exists
+    const { data: existingSettings, error: setCheckErr } = await supabase
+      .from('user_settings')
+      .select('user_id')
+      .eq('user_id', userRow.id)
+      .maybeSingle();
+    assertNoError(setCheckErr, 'syncFirebaseUser(check user_settings) failed');
+
+    if (!existingSettings) {
+      const { error: setInsertErr } = await supabase
+        .from('user_settings')
+        .insert([{ user_id: userRow.id }]);
+      assertNoError(setInsertErr, 'syncFirebaseUser(insert user_settings) failed');
+    }
+
+    // 5. Ensure user_identifiers are populated
+    await this.syncUserIdentifiers(userRow);
+
+    return {
+      user: { ...userRow, user_profiles: profileRow },
+      profile: profileRow
+    };
   },
 
   async updateUserProfile(userId, updateData) {
-    try {
-      await supabase
-        .from('user_profiles')
-        .update(updateData)
-        .eq('user_id', userId);
-    } catch (e) {}
-
-    // Fallback
-    const pIndex = fallbackStore.profiles.findIndex((p) => p.user_id === userId);
-    if (pIndex !== -1) {
-      fallbackStore.profiles[pIndex] = { ...fallbackStore.profiles[pIndex], ...updateData };
-    } else {
-      fallbackStore.profiles.push({ user_id: userId, ...updateData });
+    if (!isUuid(userId)) {
+      throw new Error('Invalid user UUID.');
     }
-    persistFallback();
+
+    const userUpdates = {};
+    if (typeof updateData.username === 'string' && updateData.username.trim()) {
+      userUpdates.username = updateData.username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+    }
+    if (updateData.mobile !== undefined) {
+      userUpdates.mobile_number = updateData.mobile ? updateData.mobile.trim() : null;
+    }
+
+    if (Object.keys(userUpdates).length > 0) {
+      userUpdates.updated_at = new Date().toISOString();
+      const { data: updatedUser, error: uErr } = await supabase
+        .from('users')
+        .update(userUpdates)
+        .eq('id', userId)
+        .select()
+        .single();
+      assertNoError(uErr, 'updateUserProfile(users) failed');
+      await this.syncUserIdentifiers(updatedUser);
+    }
+
+    const profileUpdates = {
+      updated_at: new Date().toISOString()
+    };
+    if (updateData.display_name !== undefined) profileUpdates.display_name = updateData.display_name;
+    if (updateData.avatar_url !== undefined) profileUpdates.avatar_url = updateData.avatar_url;
+    if (updateData.bio !== undefined) profileUpdates.bio = updateData.bio;
+    if (updateData.relationship_status !== undefined) {
+      profileUpdates.relationship_status = updateData.relationship_status;
+    }
+    if (updateData.anniversary_date !== undefined) {
+      profileUpdates.anniversary_date = updateData.anniversary_date || null;
+    }
+
+    const { error: pErr } = await supabase
+      .from('user_profiles')
+      .update(profileUpdates)
+      .eq('user_id', userId);
+    assertNoError(pErr, 'updateUserProfile(user_profiles) failed');
+
     return true;
   },
 
-  async searchUsers(query) {
-    const q = (query || '').toLowerCase().trim();
-    if (!q) return [];
+  async searchUsers(query, excludeUserId = null) {
+    const raw = (query || '').trim().replace(/^@/, '');
+    if (!raw) return [];
 
-    try {
-      const { data } = await supabase
-        .from('users')
-        .select('id, username, user_profiles(display_name, avatar_url, bio, online_status)')
-        .or(`username.ilike.%${q}%,email.ilike.%${q}%,id.eq.${q}`)
-        .limit(20);
+    // Direct UUID lookup
+    if (isUuid(raw)) {
+      const found = await this.findUserById(raw);
+      if (!found || found.id === excludeUserId) return [];
+      return [{
+        id: found.id,
+        username: found.username,
+        displayName: found.user_profiles?.display_name || found.username,
+        avatarUrl: found.user_profiles?.avatar_url || null,
+        bio: found.user_profiles?.bio || 'In a love story written by the stars ✨',
+        onlineStatus: Boolean(found.user_profiles?.online_status)
+      }];
+    }
 
-      if (data && data.length > 0) {
-        return data.map((d) => ({
-          id: d.id,
-          username: d.username,
-          displayName: d.user_profiles?.display_name || d.username,
-          avatarUrl: d.user_profiles?.avatar_url,
-          bio: d.user_profiles?.bio || 'In a love story written by the stars ✨',
-          onlineStatus: Boolean(d.user_profiles?.online_status)
-        }));
-      }
-    } catch (e) {}
+    const pattern = `%${escapeIlike(raw.toLowerCase())}%`;
 
-    // Fallback store search (stripping private email and mobile number)
-    const matched = fallbackStore.users.filter(
-      (u) =>
-        u.username?.toLowerCase().includes(q) ||
-        u.id?.toLowerCase() === q ||
-        u.email?.toLowerCase() === q ||
-        u.mobile_number === q
-    );
+    // Search by username (never searches or exposes private email/mobile)
+    const { data: byUsername, error: err1 } = await supabase
+      .from('users')
+      .select('id, username, user_profiles(display_name, avatar_url, bio, online_status)')
+      .ilike('username', pattern)
+      .limit(20);
+    assertNoError(err1, 'searchUsers(username) failed');
 
-    return matched.map((u) => {
-      const prof = fallbackStore.profiles.find((p) => p.user_id === u.id);
-      return {
+    // Also search by display_name
+    const { data: byDisplayName, error: err2 } = await supabase
+      .from('user_profiles')
+      .select('user_id, display_name, avatar_url, bio, online_status, users!user_profiles_user_id_fkey(id, username)')
+      .ilike('display_name', pattern)
+      .limit(20);
+    assertNoError(err2, 'searchUsers(display_name) failed');
+
+    const map = new Map();
+    for (const u of byUsername || []) {
+      if (u.id === excludeUserId) continue;
+      const prof = normalizeProfileJoin(u.user_profiles);
+      map.set(u.id, {
         id: u.id,
         username: u.username,
         displayName: prof?.display_name || u.username,
-        avatarUrl: prof?.avatar_url,
+        avatarUrl: prof?.avatar_url || null,
         bio: prof?.bio || 'In a love story written by the stars ✨',
         onlineStatus: Boolean(prof?.online_status)
-      };
-    });
+      });
+    }
+
+    for (const p of byDisplayName || []) {
+      const uid = p.user_id;
+      if (!uid || uid === excludeUserId || map.has(uid)) continue;
+      const usr = Array.isArray(p.users) ? p.users[0] : p.users;
+      map.set(uid, {
+        id: uid,
+        username: usr?.username || 'user',
+        displayName: p.display_name || usr?.username || 'Soul Member',
+        avatarUrl: p.avatar_url || null,
+        bio: p.bio || 'In a love story written by the stars ✨',
+        onlineStatus: Boolean(p.online_status)
+      });
+    }
+
+    return Array.from(map.values()).slice(0, 20);
   },
 
   // =========================================================================
   // OTP VERIFICATIONS
   // =========================================================================
   async saveOtp(email, otpHash, purpose, expiresAt) {
-    try {
-      await supabase
-        .from('otp_verifications')
-        .insert([{ email, otp_hash: otpHash, purpose, expires_at: expiresAt }]);
-    } catch (e) {}
+    const { data, error } = await supabase
+      .from('otp_verifications')
+      .insert([{
+        id: crypto.randomUUID(),
+        email: email.toLowerCase().trim(),
+        otp_hash: otpHash,
+        purpose,
+        expires_at: expiresAt,
+        is_used: false
+      }])
+      .select()
+      .single();
 
-    fallbackStore.otp_verifications.push({
-      id: 'otp-' + Date.now(),
-      email,
-      otp_hash: otpHash,
-      purpose,
-      expires_at: expiresAt,
-      is_used: false,
-      created_at: new Date().toISOString()
-    });
-    persistFallback();
+    assertNoError(error, 'saveOtp failed');
+    return data;
   },
 
   async getLatestOtp(email, purpose) {
-    const records = fallbackStore.otp_verifications.filter(
-      (o) => o.email === email && o.purpose === purpose && !o.is_used
-    );
-    if (records.length === 0) return null;
-    return records[records.length - 1];
+    const { data, error } = await supabase
+      .from('otp_verifications')
+      .select('*')
+      .eq('email', email.toLowerCase().trim())
+      .eq('purpose', purpose)
+      .eq('is_used', false)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    assertNoError(error, 'getLatestOtp failed');
+    return data;
   },
 
   async markOtpUsed(otpId) {
-    const o = fallbackStore.otp_verifications.find((x) => x.id === otpId);
-    if (o) {
-      o.is_used = true;
-      persistFallback();
-    }
+    const { error } = await supabase
+      .from('otp_verifications')
+      .update({ is_used: true })
+      .eq('id', otpId);
+
+    assertNoError(error, 'markOtpUsed failed');
+    return true;
   },
 
   // =========================================================================
   // TERMS ACCEPTANCE
   // =========================================================================
   async recordTermsAcceptance(data) {
-    try {
-      await supabase.from('terms_acceptance').insert([data]);
-    } catch (e) {}
-    fallbackStore.terms_acceptance.push({ ...data, id: 'terms-' + Date.now() });
-    persistFallback();
+    const payload = {
+      id: crypto.randomUUID(),
+      user_id: isUuid(data.user_id) ? data.user_id : null,
+      ip_address: data.ip_address || null,
+      terms_version: data.terms_version || 'v1.0.0',
+      privacy_version: data.privacy_version || 'v1.0.0',
+      accepted_at: data.accepted_at || new Date().toISOString()
+    };
+
+    const { error } = await supabase.from('terms_acceptance').insert([payload]);
+    assertNoError(error, 'recordTermsAcceptance failed');
+    return true;
   },
 
   // =========================================================================
-  // CONVERSATIONS & MESSAGES
+  // CONVERSATIONS & CONVERSATION MEMBERS
   // =========================================================================
-  // CONVERSATIONS & GROUPS
-  // =========================================================================
+  async findDirectConversationBetween(userAId, userBId) {
+    if (!isUuid(userAId) || !isUuid(userBId)) return null;
+
+    const { data: myMemberships, error: memErr } = await supabase
+      .from('conversation_members')
+      .select('conversation_id, conversations!inner(id, type, title, last_message_text, last_message_at, created_at)')
+      .eq('user_id', userAId)
+      .eq('conversations.type', 'direct');
+
+    assertNoError(memErr, 'findDirectConversationBetween(A) failed');
+    if (!myMemberships || myMemberships.length === 0) return null;
+
+    const convIds = myMemberships.map((m) => m.conversation_id);
+    const { data: partnerMatch, error: pErr } = await supabase
+      .from('conversation_members')
+      .select('conversation_id')
+      .eq('user_id', userBId)
+      .in('conversation_id', convIds)
+      .limit(1)
+      .maybeSingle();
+
+    assertNoError(pErr, 'findDirectConversationBetween(B) failed');
+    if (!partnerMatch) return null;
+
+    return this.getConversationById(partnerMatch.conversation_id, userAId);
+  },
+
   async getConversationsForUser(userId) {
-    if (!fallbackStore.conversations) fallbackStore.conversations = [];
+    if (!isUuid(userId)) return [];
 
-    // Filter conversations where user is a participant or member
-    const userConvs = fallbackStore.conversations.filter(
-      (c) =>
-        c.partnerId === userId ||
-        c.creatorId === userId ||
-        (Array.isArray(c.members) && c.members.includes(userId))
-    );
+    const { data: memberships, error } = await supabase
+      .from('conversation_members')
+      .select('conversation_id, unread_count, is_archived, is_pinned, is_muted, conversations(*)')
+      .eq('user_id', userId);
 
-    if (userConvs.length > 0) return userConvs;
-    return fallbackStore.conversations;
+    assertNoError(error, 'getConversationsForUser failed');
+    if (!memberships || memberships.length === 0) return [];
+
+    const convIds = memberships.map((m) => m.conversation_id);
+    const { data: allMembers, error: mErr } = await supabase
+      .from('conversation_members')
+      .select('conversation_id, user_id, users(id, username, user_profiles(display_name, avatar_url, online_status, last_seen))')
+      .in('conversation_id', convIds);
+    assertNoError(mErr, 'getConversationsForUser(members) failed');
+
+    const { data: userContacts, error: cErr } = await supabase
+      .from('contacts')
+      .select('contact_user_id, nickname')
+      .eq('user_id', userId);
+    assertNoError(cErr, 'getConversationsForUser(contacts) failed');
+
+    const nicknameMap = new Map((userContacts || []).map((c) => [c.contact_user_id, c.nickname]));
+    const membersByConv = new Map();
+    for (const row of allMembers || []) {
+      if (!membersByConv.has(row.conversation_id)) {
+        membersByConv.set(row.conversation_id, []);
+      }
+      membersByConv.get(row.conversation_id).push(row);
+    }
+
+    const result = memberships.map((m) => {
+      const conv = Array.isArray(m.conversations) ? m.conversations[0] : m.conversations;
+      const participants = membersByConv.get(m.conversation_id) || [];
+      const isGroup = conv?.type === 'group';
+      const partnerEntry = !isGroup
+        ? participants.find((p) => p.user_id !== userId) || participants[0]
+        : null;
+      const partnerUser = partnerEntry?.users
+        ? (Array.isArray(partnerEntry.users) ? partnerEntry.users[0] : partnerEntry.users)
+        : null;
+      const partnerProfile = normalizeProfileJoin(partnerUser?.user_profiles);
+
+      const partnerId = partnerUser?.id || partnerEntry?.user_id || null;
+      const partnerNickname = partnerId ? nicknameMap.get(partnerId) : null;
+
+      return {
+        id: m.conversation_id,
+        type: conv?.type || 'direct',
+        isGroup,
+        name: isGroup
+          ? (conv?.title || 'Romantic Group')
+          : (partnerNickname || partnerProfile?.display_name || partnerUser?.username || conv?.title || 'Soul Partner'),
+        avatarUrl: isGroup
+          ? `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(conv?.title || m.conversation_id)}`
+          : (partnerProfile?.avatar_url || `https://api.dicebear.com/7.x/adventurer/svg?seed=${partnerId || m.conversation_id}`),
+        partnerId,
+        online: Boolean(partnerProfile?.online_status),
+        lastSeen: partnerProfile?.online_status ? 'Online' : (partnerProfile?.last_seen || 'Recently active'),
+        members: participants.map((p) => p.user_id),
+        lastMessageText: conv?.last_message_text || 'Say hi! 💕',
+        lastMessageAt: conv?.last_message_at || conv?.created_at,
+        unreadCount: m.unread_count || 0,
+        createdAt: conv?.created_at
+      };
+    });
+
+    result.sort((a, b) => new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0));
+    return result;
   },
 
-  async getConversationById(conversationId) {
-    if (!conversationId) return null;
+  async getConversationById(conversationId, viewerUserId = null) {
+    if (!isUuid(conversationId)) return null;
 
-    if (!fallbackStore.conversations) fallbackStore.conversations = [];
-    const local = fallbackStore.conversations.find((c) => c.id === conversationId);
-    if (local) return local;
+    const { data, error } = await supabase
+      .from('conversations')
+      .select('*, conversation_members(*)')
+      .eq('id', conversationId)
+      .maybeSingle();
 
-    try {
-      const { data, error } = await supabase
-        .from('conversations')
-        .select('*, conversation_members(*)')
-        .eq('id', conversationId)
-        .maybeSingle();
+    assertNoError(error, 'getConversationById failed');
+    if (!data) return null;
 
-      if (!error && data) {
-        return {
-          id: data.id,
-          type: data.type,
-          name: data.title,
-          isGroup: data.type === 'group',
-          partnerId: data.type === 'direct' ? data.conversation_members?.find((m) => true)?.user_id : null,
-          members: data.conversation_members?.map((m) => m.user_id) || []
-        };
-      }
-    } catch (e) {}
+    const members = (data.conversation_members || []).map((m) => m.user_id);
+    const partnerId = data.type === 'direct'
+      ? (viewerUserId ? members.find((id) => id !== viewerUserId) : members[0]) || null
+      : null;
 
-    return null;
+    return {
+      id: data.id,
+      type: data.type,
+      name: data.title,
+      isGroup: data.type === 'group',
+      partnerId,
+      members,
+      lastMessageText: data.last_message_text,
+      lastMessageAt: data.last_message_at,
+      createdAt: data.created_at
+    };
   },
 
   async isConversationMember(userId, conversationId) {
-    if (!userId || !conversationId) return false;
-    if (conversationId === 'conv-default' || conversationId.startsWith('partner-demo')) return true;
+    if (!isUuid(userId) || !isUuid(conversationId)) return false;
 
-    if (!fallbackStore.conversations) fallbackStore.conversations = [];
-    const conv = fallbackStore.conversations.find((c) => c.id === conversationId);
-    if (conv) {
-      if (conv.creatorId === userId || conv.partnerId === userId) return true;
-      if (Array.isArray(conv.members) && conv.members.includes(userId)) return true;
-    }
+    const { data, error } = await supabase
+      .from('conversation_members')
+      .select('id')
+      .eq('conversation_id', conversationId)
+      .eq('user_id', userId)
+      .maybeSingle();
 
-    try {
-      const { data, error } = await supabase
-        .from('conversation_members')
-        .select('id')
-        .eq('conversation_id', conversationId)
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (!error && data) return true;
-    } catch (e) {}
-
-    return false;
+    assertNoError(error, 'isConversationMember failed');
+    return Boolean(data);
   },
 
   async createConversation(convData) {
-    if (!fallbackStore.conversations) fallbackStore.conversations = [];
-    const convId = convData.id || 'conv-' + Date.now();
-    const newConv = {
-      id: convId,
-      type: convData.type || 'direct', // 'direct' | 'group'
-      name: convData.name || convData.title || 'Soul Chat',
+    const type = convData.type || 'direct';
+
+    if (type === 'direct' && isUuid(convData.creatorId) && isUuid(convData.partnerId)) {
+      const existing = await this.findDirectConversationBetween(convData.creatorId, convData.partnerId);
+      if (existing) return existing;
+    }
+
+    const convId = isUuid(convData.id) ? convData.id : crypto.randomUUID();
+    const now = new Date().toISOString();
+    const title = convData.name || convData.title || (type === 'group' ? 'Romantic Group' : 'Direct Chat');
+    const lastMessageText = convData.lastMessageText || 'Say hi! 💕';
+
+    const { data: inserted, error: convErr } = await supabase
+      .from('conversations')
+      .insert([{
+        id: convId,
+        type,
+        title,
+        last_message_text: lastMessageText,
+        last_message_at: now
+      }])
+      .select()
+      .single();
+
+    assertNoError(convErr, 'createConversation failed');
+
+    const memberIds = Array.from(
+      new Set([convData.creatorId, convData.partnerId, ...(convData.members || [])].filter(isUuid))
+    );
+
+    if (memberIds.length > 0) {
+      const memberRows = memberIds.map((uid) => ({
+        id: crypto.randomUUID(),
+        conversation_id: inserted.id,
+        user_id: uid
+      }));
+      const { error: memErr } = await supabase
+        .from('conversation_members')
+        .upsert(memberRows, { onConflict: 'conversation_id,user_id' });
+      assertNoError(memErr, 'createConversation(members) failed');
+    }
+
+    return {
+      id: inserted.id,
+      type: inserted.type,
+      name: title,
       avatarUrl: convData.avatarUrl || null,
-      isGroup: convData.type === 'group',
+      isGroup: type === 'group',
       description: convData.description || null,
       creatorId: convData.creatorId || null,
-      partnerId: convData.partnerId || null,
-      members: convData.members || [],
-      lastMessageText: convData.lastMessageText || 'Chat created',
-      lastMessageAt: new Date().toISOString(),
+      partnerId: type === 'direct' ? convData.partnerId || null : null,
+      members: memberIds,
+      lastMessageText: inserted.last_message_text,
+      lastMessageAt: inserted.last_message_at,
       unreadCount: 0,
-      createdAt: new Date().toISOString()
+      createdAt: inserted.created_at
     };
-
-    try {
-      await supabase.from('conversations').insert([{
-        id: convId,
-        type: newConv.type,
-        title: newConv.name,
-        last_message_text: newConv.lastMessageText,
-        last_message_at: newConv.lastMessageAt
-      }]);
-    } catch (e) {}
-
-    fallbackStore.conversations.unshift(newConv);
-    persistFallback();
-    return newConv;
   },
 
   // =========================================================================
   // MESSAGES, REACTIONS & DELETIONS
   // =========================================================================
   async saveMessage(msg) {
-    try {
-      await supabase.from('messages').insert([msg]);
-    } catch (e) {}
-
-    if (!fallbackStore.messages) fallbackStore.messages = [];
-    fallbackStore.messages.push(msg);
-
-    // Update conversation last message snippet
-    if (fallbackStore.conversations) {
-      const conv = fallbackStore.conversations.find((c) => c.id === msg.conversationId);
-      if (conv) {
-        conv.lastMessageText = msg.content || (msg.messageType === 'audio' ? 'Voice Message 🎙️' : 'Attachment 📎');
-        conv.lastMessageAt = msg.createdAt;
-      }
+    if (!isUuid(msg.conversationId)) {
+      throw new Error('Valid conversation UUID is required.');
+    }
+    if (!isUuid(msg.senderId)) {
+      throw new Error('Valid sender UUID is required.');
     }
 
-    persistFallback();
-    return msg;
+    const msgId = isUuid(msg.id) ? msg.id : crypto.randomUUID();
+    const createdAt = msg.createdAt || new Date().toISOString();
+
+    const row = {
+      id: msgId,
+      conversation_id: msg.conversationId,
+      sender_id: msg.senderId,
+      reply_to_id: isUuid(msg.replyToId) ? msg.replyToId : null,
+      message_type: msg.messageType || 'text',
+      content: msg.content || null,
+      media_url: msg.mediaUrl || null,
+      audio_url: msg.audioUrl || null,
+      file_name: msg.fileName || null,
+      file_size: msg.fileSize ? Number(msg.fileSize) : null,
+      mega_file_handle: msg.megaFileHandle || null,
+      mega_download_url: msg.megaDownloadUrl || null,
+      delivery_status: msg.deliveryStatus || 'sent',
+      created_at: createdAt
+    };
+
+    const { data: inserted, error } = await supabase
+      .from('messages')
+      .insert([row])
+      .select()
+      .single();
+
+    assertNoError(error, 'saveMessage failed');
+
+    const snippet =
+      row.message_type === 'audio'
+        ? 'Voice Message 🎙️'
+        : row.message_type === 'image'
+          ? 'Photo 📷'
+          : row.message_type === 'video'
+            ? 'Video 🎬'
+            : row.message_type === 'file'
+              ? `Attachment: ${row.file_name || 'File'}`
+              : (typeof row.content === 'string' && row.content.includes('"isEncrypted":true')
+                  ? '🔒 Encrypted message'
+                  : (row.content || 'New message'));
+
+    await supabase
+      .from('conversations')
+      .update({
+        last_message_text: snippet,
+        last_message_at: createdAt
+      })
+      .eq('id', row.conversation_id);
+
+    return {
+      id: inserted.id,
+      conversationId: inserted.conversation_id,
+      senderId: inserted.sender_id,
+      senderName: msg.senderName || null,
+      replyToId: inserted.reply_to_id,
+      replyToText: msg.replyToText || null,
+      messageType: inserted.message_type,
+      content: inserted.content,
+      mediaUrl: inserted.media_url,
+      audioUrl: inserted.audio_url,
+      fileName: inserted.file_name,
+      fileSize: inserted.file_size,
+      megaFileHandle: inserted.mega_file_handle,
+      megaDownloadUrl: inserted.mega_download_url,
+      deliveryStatus: inserted.delivery_status,
+      isDeletedForAll: inserted.is_deleted_for_all,
+      createdAt: inserted.created_at
+    };
   },
 
   async getMessages(conversationId) {
-    if (!fallbackStore.messages) fallbackStore.messages = [];
-    return fallbackStore.messages.filter((m) => m.conversationId === conversationId || !conversationId);
+    if (!isUuid(conversationId)) return [];
+
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*, message_reactions(user_id, reaction)')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: true });
+
+    assertNoError(error, 'getMessages failed');
+
+    return (data || []).map((m) => ({
+      id: m.id,
+      conversationId: m.conversation_id,
+      senderId: m.sender_id,
+      replyToId: m.reply_to_id,
+      messageType: m.message_type,
+      content: m.content,
+      mediaUrl: m.media_url,
+      audioUrl: m.audio_url,
+      fileName: m.file_name,
+      fileSize: m.file_size,
+      megaFileHandle: m.mega_file_handle,
+      megaDownloadUrl: m.mega_download_url,
+      isEdited: m.is_edited,
+      isDeletedForAll: m.is_deleted_for_all,
+      deliveryStatus: m.delivery_status,
+      reaction: m.message_reactions?.[0]?.reaction || null,
+      reactions: m.message_reactions || [],
+      createdAt: m.created_at
+    }));
   },
 
   async reactToMessage(messageId, userId, reaction) {
-    if (!fallbackStore.messages) fallbackStore.messages = [];
-    const msg = fallbackStore.messages.find((m) => m.id === messageId);
-    if (msg) {
-      msg.reaction = reaction;
-      persistFallback();
+    if (!isUuid(messageId) || !isUuid(userId)) {
+      throw new Error('Valid messageId and userId UUIDs required.');
     }
 
-    try {
-      await supabase.from('message_reactions').upsert([{
-        message_id: messageId,
-        user_id: userId,
-        reaction
-      }]);
-    } catch (e) {}
-
+    const { error } = await supabase
+      .from('message_reactions')
+      .upsert(
+        [{ id: crypto.randomUUID(), message_id: messageId, user_id: userId, reaction }],
+        { onConflict: 'message_id,user_id' }
+      );
+    assertNoError(error, 'reactToMessage failed');
     return true;
   },
 
-  async deleteMessage(messageId, deleteForEveryone = false) {
-    if (!fallbackStore.messages) fallbackStore.messages = [];
-    if (deleteForEveryone) {
-      const msg = fallbackStore.messages.find((m) => m.id === messageId);
-      if (msg) {
-        msg.content = '🚫 This message was deleted.';
-        msg.is_deleted_for_all = true;
-        msg.mediaUrl = null;
-        msg.audioUrl = null;
-        persistFallback();
-      }
-    } else {
-      fallbackStore.messages = fallbackStore.messages.filter((m) => m.id !== messageId);
-      persistFallback();
-    }
+  async deleteMessage(messageId, userId, deleteForEveryone = false) {
+    if (!isUuid(messageId)) throw new Error('Valid messageId UUID required.');
 
-    try {
-      if (deleteForEveryone) {
-        await supabase.from('messages').update({
+    if (deleteForEveryone) {
+      let query = supabase
+        .from('messages')
+        .update({
           content: '🚫 This message was deleted.',
-          is_deleted_for_all: true
-        }).eq('id', messageId);
-      } else {
-        await supabase.from('messages').delete().eq('id', messageId);
-      }
-    } catch (e) {}
+          is_deleted_for_all: true,
+          media_url: null,
+          audio_url: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', messageId);
+
+      if (isUuid(userId)) query = query.eq('sender_id', userId);
+      const { error } = await query;
+      assertNoError(error, 'deleteMessage(forAll) failed');
+    } else {
+      let query = supabase.from('messages').delete().eq('id', messageId);
+      if (isUuid(userId)) query = query.eq('sender_id', userId);
+      const { error } = await query;
+      assertNoError(error, 'deleteMessage failed');
+    }
 
     return true;
   },
@@ -425,162 +925,295 @@ export const db = {
   // STATUSES (24-Hour Ephemeral Stories)
   // =========================================================================
   async saveStatus(status) {
-    try {
-      await supabase.from('statuses').insert([status]);
-    } catch (e) {}
-    if (!fallbackStore.statuses) fallbackStore.statuses = [];
-    fallbackStore.statuses.unshift(status);
-    persistFallback();
-    return status;
+    if (!isUuid(status.userId)) throw new Error('Valid userId UUID required for status.');
+
+    const row = {
+      id: isUuid(status.id) ? status.id : crypto.randomUUID(),
+      user_id: status.userId,
+      status_type: status.type || status.statusType || 'text',
+      content: status.content || null,
+      media_url: status.mediaUrl || null,
+      mega_file_handle: status.megaFileHandle || null,
+      caption: status.caption || null,
+      background_color: status.gradient || status.backgroundColor || '#2e0854',
+      font_family: status.fontFamily || 'default',
+      views_count: 0,
+      expires_at: status.expiresAt || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      created_at: status.createdAt || new Date().toISOString()
+    };
+
+    const { data, error } = await supabase
+      .from('statuses')
+      .insert([row])
+      .select()
+      .single();
+    assertNoError(error, 'saveStatus failed');
+
+    return {
+      id: data.id,
+      userId: data.user_id,
+      userName: status.userName || 'Soul User',
+      userAvatar: status.userAvatar || null,
+      type: data.status_type,
+      content: data.content,
+      gradient: data.background_color,
+      mediaUrl: data.media_url,
+      caption: data.caption,
+      createdAt: data.created_at,
+      expiresAt: data.expires_at,
+      viewsCount: data.views_count || 0,
+      viewers: []
+    };
   },
 
   async getStatuses(userId) {
-    const now = new Date();
-    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const nowIso = new Date().toISOString();
 
-    let allStatuses = [];
+    const { data, error } = await supabase
+      .from('statuses')
+      .select('*, users:user_id(id, username, user_profiles(*)), status_views(*)')
+      .gt('expires_at', nowIso)
+      .order('created_at', { ascending: false });
 
-    try {
-      const { data, error } = await supabase
-        .from('statuses')
-        .select('*, user:user_id(id, username, user_profiles(*)), status_views(*)')
-        .gt('created_at', twentyFourHoursAgo.toISOString())
-        .order('created_at', { ascending: false });
+    assertNoError(error, 'getStatuses failed');
 
-      if (!error && data && data.length > 0) {
-        allStatuses = data.map(s => ({
-          id: s.id,
-          userId: s.user_id,
-          userName: s.user?.user_profiles?.display_name || s.user?.username || 'Partner',
-          userAvatar: s.user?.user_profiles?.avatar_url,
-          type: s.type || 'text',
-          content: s.content,
-          gradient: s.gradient,
-          mediaUrl: s.media_url,
-          caption: s.caption,
-          privacy: s.privacy || 'contacts',
-          createdAt: s.created_at,
-          expiresAt: s.expires_at,
-          viewsCount: s.status_views?.length || 0,
-          viewers: (s.status_views || []).map(v => v.viewer_id)
-        }));
-      }
-    } catch (e) {}
+    const allStatuses = (data || []).map((s) => {
+      const usr = Array.isArray(s.users) ? s.users[0] : s.users;
+      const prof = normalizeProfileJoin(usr?.user_profiles);
+      return {
+        id: s.id,
+        userId: s.user_id,
+        userName: prof?.display_name || usr?.username || 'Partner',
+        userAvatar: prof?.avatar_url || null,
+        type: s.status_type || 'text',
+        content: s.content,
+        gradient: s.background_color,
+        mediaUrl: s.media_url,
+        caption: s.caption,
+        createdAt: s.created_at,
+        expiresAt: s.expires_at,
+        viewsCount: s.status_views?.length || s.views_count || 0,
+        viewers: (s.status_views || []).map((v) => v.viewer_id)
+      };
+    });
 
-    // Fallback store
-    if (allStatuses.length === 0) {
-      if (!fallbackStore.statuses) fallbackStore.statuses = [];
-      allStatuses = fallbackStore.statuses.filter(s => {
-        const createdAt = new Date(s.createdAt || s.created_at || 0);
-        const expiresAt = s.expiresAt ? new Date(s.expiresAt) : new Date(createdAt.getTime() + 24 * 60 * 60 * 1000);
-        return expiresAt > now;
-      });
-    }
-
-    const myStatuses = userId ? allStatuses.filter(s => s.userId === userId) : [];
-    const otherStatuses = userId ? allStatuses.filter(s => s.userId !== userId) : allStatuses;
+    const myStatuses = userId ? allStatuses.filter((s) => s.userId === userId) : [];
+    const otherStatuses = userId ? allStatuses.filter((s) => s.userId !== userId) : allStatuses;
 
     return { statuses: otherStatuses, myStatuses };
   },
 
-  async markStatusViewed(statusId, viewerId, viewerName) {
-    if (!viewerId) return null;
+  async markStatusViewed(statusId, viewerId) {
+    if (!isUuid(statusId) || !isUuid(viewerId)) return null;
 
-    try {
-      await supabase.from('status_views').insert([{
-        status_id: statusId,
-        viewer_id: viewerId,
-        viewed_at: new Date().toISOString()
-      }]);
-    } catch (e) {}
+    const { error } = await supabase
+      .from('status_views')
+      .upsert(
+        [{ id: crypto.randomUUID(), status_id: statusId, viewer_id: viewerId, viewed_at: new Date().toISOString() }],
+        { onConflict: 'status_id,viewer_id' }
+      );
+    assertNoError(error, 'markStatusViewed failed');
 
-    if (!fallbackStore.statuses) fallbackStore.statuses = [];
-    const status = fallbackStore.statuses.find(s => s.id === statusId);
-    if (status) {
-      if (!status.viewers) status.viewers = [];
-      const alreadyViewed = status.viewers.some(v => (typeof v === 'string' ? v === viewerId : v.viewerId === viewerId));
-      if (!alreadyViewed) {
-        status.viewers.push({
-          viewerId,
-          viewerName: viewerName || 'Partner',
-          viewedAt: new Date().toISOString()
-        });
-        status.viewsCount = (status.viewsCount || 0) + 1;
-        persistFallback();
-      }
-      return status;
+    const { count } = await supabase
+      .from('status_views')
+      .select('id', { count: 'exact', head: true })
+      .eq('status_id', statusId);
+
+    if (typeof count === 'number') {
+      await supabase.from('statuses').update({ views_count: count }).eq('id', statusId);
     }
-    return null;
+
+    return { id: statusId, viewsCount: count || 0 };
   },
 
-  async deleteStatus(statusId) {
-    try {
-      await supabase.from('statuses').delete().eq('id', statusId);
-    } catch (e) {}
-
-    if (!fallbackStore.statuses) fallbackStore.statuses = [];
-    fallbackStore.statuses = fallbackStore.statuses.filter(s => s.id !== statusId);
-    persistFallback();
+  async deleteStatus(statusId, userId = null) {
+    if (!isUuid(statusId)) return true;
+    let query = supabase.from('statuses').delete().eq('id', statusId);
+    if (isUuid(userId)) query = query.eq('user_id', userId);
+    const { error } = await query;
+    assertNoError(error, 'deleteStatus failed');
     return true;
   },
 
   // =========================================================================
-  // MEMORY VAULT (MEGA Cloud Storage Integration)
+  // MEMORY VAULT (MEGA Cloud Storage Metadata in Supabase)
   // =========================================================================
+  async getOrCreateDefaultMemorySpace(userId) {
+    if (!isUuid(userId)) throw new Error('Valid userId UUID required for Memory Vault.');
+
+    const { data: membership, error: memErr } = await supabase
+      .from('memory_members')
+      .select('space_id')
+      .eq('user_id', userId)
+      .limit(1)
+      .maybeSingle();
+    assertNoError(memErr, 'getOrCreateDefaultMemorySpace(lookup) failed');
+
+    if (membership?.space_id) return membership.space_id;
+
+    const spaceId = crypto.randomUUID();
+    const { error: spaceErr } = await supabase
+      .from('memory_spaces')
+      .insert([{
+        id: spaceId,
+        name: 'Our Romantic Vault',
+        created_by: userId
+      }]);
+    assertNoError(spaceErr, 'getOrCreateDefaultMemorySpace(create space) failed');
+
+    const { error: addMemErr } = await supabase
+      .from('memory_members')
+      .insert([{
+        id: crypto.randomUUID(),
+        space_id: spaceId,
+        user_id: userId,
+        access_level: 'admin'
+      }]);
+    assertNoError(addMemErr, 'getOrCreateDefaultMemorySpace(add member) failed');
+
+    return spaceId;
+  },
+
+  async getOrCreateAlbum(spaceId, albumName) {
+    if (!albumName || albumName === 'All Memories') return null;
+
+    const { data: existing, error: findErr } = await supabase
+      .from('memory_albums')
+      .select('id')
+      .eq('space_id', spaceId)
+      .eq('name', albumName)
+      .maybeSingle();
+    assertNoError(findErr, 'getOrCreateAlbum(find) failed');
+    if (existing) return existing.id;
+
+    const { data: created, error: createErr } = await supabase
+      .from('memory_albums')
+      .insert([{ id: crypto.randomUUID(), space_id: spaceId, name: albumName }])
+      .select('id')
+      .single();
+    assertNoError(createErr, 'getOrCreateAlbum(create) failed');
+    return created.id;
+  },
+
   async saveMemory(memory) {
-    try {
-      await supabase.from('memory_files').insert([memory]);
-    } catch (e) {}
-    if (!fallbackStore.memories) fallbackStore.memories = [];
-    fallbackStore.memories.unshift(memory);
-    persistFallback();
-    return memory;
+    if (!isUuid(memory.uploaderId)) throw new Error('Valid uploaderId UUID required.');
+
+    const spaceId = isUuid(memory.spaceId)
+      ? memory.spaceId
+      : await this.getOrCreateDefaultMemorySpace(memory.uploaderId);
+    const albumId = await this.getOrCreateAlbum(spaceId, memory.album);
+
+    const row = {
+      id: isUuid(memory.id) ? memory.id : crypto.randomUUID(),
+      space_id: spaceId,
+      album_id: albumId,
+      uploader_id: memory.uploaderId,
+      file_name: memory.fileName,
+      file_type: memory.fileType || 'document',
+      file_size: Number(memory.fileSize || 0),
+      mime_type: memory.mimeType || null,
+      mega_file_handle: memory.megaFileHandle || null,
+      mega_download_url: memory.megaDownloadUrl || null,
+      thumbnail_url: memory.thumbnailUrl || null,
+      caption: memory.caption || null,
+      memory_date: memory.memoryDate || new Date().toISOString().split('T')[0],
+      feelings_tag: memory.feelingsTag || null
+    };
+
+    const { data, error } = await supabase
+      .from('memory_files')
+      .insert([row])
+      .select()
+      .single();
+    assertNoError(error, 'saveMemory failed');
+
+    return {
+      id: data.id,
+      spaceId: data.space_id,
+      fileName: data.file_name,
+      fileType: data.file_type,
+      fileSize: data.file_size,
+      mimeType: data.mime_type,
+      megaFileHandle: data.mega_file_handle,
+      megaDownloadUrl: data.mega_download_url,
+      megaPublicUrl: memory.megaPublicUrl || data.mega_download_url,
+      caption: data.caption,
+      memoryDate: data.memory_date,
+      feelingsTag: data.feelings_tag,
+      album: memory.album || 'All Memories',
+      uploaderId: data.uploader_id,
+      uploaderName: memory.uploaderName || 'Soul Partner',
+      createdAt: data.created_at
+    };
   },
 
   async getMemories(userId) {
-    try {
-      const { data, error } = await supabase
-        .from('memory_files')
-        .select('*')
-        .order('created_at', { ascending: false });
+    if (!isUuid(userId)) return [];
 
-      if (!error && data && data.length > 0) {
-        return data.map(m => ({
-          id: m.id,
-          fileName: m.file_name || m.fileName,
-          fileType: m.file_type || m.fileType,
-          fileSize: m.file_size || m.fileSize,
-          mimeType: m.mime_type || m.mimeType,
-          megaFileHandle: m.mega_file_handle || m.megaFileHandle,
-          megaDownloadUrl: m.mega_download_url || m.megaDownloadUrl,
-          caption: m.caption,
-          memoryDate: m.memory_date || m.memoryDate,
-          feelingsTag: m.feelings_tag || m.feelingsTag,
-          album: m.album || 'All Memories',
-          uploaderId: m.uploader_id || m.uploaderId,
-          uploaderName: m.uploader_name || m.uploaderName || 'Soul Partner',
-          createdAt: m.created_at || m.createdAt
-        }));
-      }
-    } catch (e) {}
+    const { data: memberships, error: memErr } = await supabase
+      .from('memory_members')
+      .select('space_id')
+      .eq('user_id', userId);
+    assertNoError(memErr, 'getMemories(spaces) failed');
 
-    if (!fallbackStore.memories) fallbackStore.memories = [];
-    return fallbackStore.memories;
+    const spaceIds = (memberships || []).map((m) => m.space_id);
+    if (spaceIds.length === 0) return [];
+
+    const { data, error } = await supabase
+      .from('memory_files')
+      .select('*, memory_albums(name), uploader:uploader_id(id, username, user_profiles(display_name))')
+      .in('space_id', spaceIds)
+      .order('created_at', { ascending: false });
+    assertNoError(error, 'getMemories failed');
+
+    return (data || []).map((m) => {
+      const album = Array.isArray(m.memory_albums) ? m.memory_albums[0] : m.memory_albums;
+      const uploader = Array.isArray(m.uploader) ? m.uploader[0] : m.uploader;
+      const uploaderProf = normalizeProfileJoin(uploader?.user_profiles);
+
+      return {
+        id: m.id,
+        spaceId: m.space_id,
+        fileName: m.file_name,
+        fileType: m.file_type,
+        fileSize: m.file_size,
+        mimeType: m.mime_type,
+        megaFileHandle: m.mega_file_handle,
+        megaDownloadUrl: m.mega_download_url,
+        caption: m.caption,
+        memoryDate: m.memory_date,
+        feelingsTag: m.feelings_tag,
+        album: album?.name || 'All Memories',
+        uploaderId: m.uploader_id,
+        uploaderName: uploaderProf?.display_name || uploader?.username || 'Soul Partner',
+        createdAt: m.created_at
+      };
+    });
   },
 
   async getMemoryById(memoryId) {
-    if (!fallbackStore.memories) fallbackStore.memories = [];
-    return fallbackStore.memories.find(m => m.id === memoryId) || null;
+    if (!isUuid(memoryId)) return null;
+    const { data, error } = await supabase
+      .from('memory_files')
+      .select('*')
+      .eq('id', memoryId)
+      .maybeSingle();
+    assertNoError(error, 'getMemoryById failed');
+    if (!data) return null;
+    return {
+      id: data.id,
+      spaceId: data.space_id,
+      uploaderId: data.uploader_id,
+      megaFileHandle: data.mega_file_handle
+    };
   },
 
-  async deleteMemory(memoryId) {
-    try {
-      await supabase.from('memory_files').delete().eq('id', memoryId);
-    } catch (e) {}
-
-    if (!fallbackStore.memories) fallbackStore.memories = [];
-    fallbackStore.memories = fallbackStore.memories.filter((m) => m.id !== memoryId);
-    persistFallback();
+  async deleteMemory(memoryId, userId = null) {
+    if (!isUuid(memoryId)) return true;
+    let query = supabase.from('memory_files').delete().eq('id', memoryId);
+    if (isUuid(userId)) query = query.eq('uploader_id', userId);
+    const { error } = await query;
+    assertNoError(error, 'deleteMemory failed');
     return true;
   },
 
@@ -588,211 +1221,167 @@ export const db = {
   // CALLS
   // =========================================================================
   async saveCallLog(callData) {
-    try {
-      await supabase.from('calls').insert([callData]);
-    } catch (e) {}
-    if (!fallbackStore.calls) fallbackStore.calls = [];
-    fallbackStore.calls.unshift(callData);
-    persistFallback();
-    return callData;
+    if (!isUuid(callData.callerId) || !isUuid(callData.receiverId)) {
+      throw new Error('Valid callerId and receiverId UUIDs required.');
+    }
+
+    const row = {
+      id: isUuid(callData.id) ? callData.id : crypto.randomUUID(),
+      caller_id: callData.callerId,
+      receiver_id: callData.receiverId,
+      call_type: callData.callType || 'audio',
+      call_status: callData.callStatus || 'ended',
+      started_at: callData.startedAt || new Date().toISOString(),
+      ended_at: new Date().toISOString(),
+      duration_seconds: Number(callData.durationSeconds || 0)
+    };
+
+    const { data, error } = await supabase.from('calls').insert([row]).select().single();
+    assertNoError(error, 'saveCallLog failed');
+
+    return {
+      id: data.id,
+      callerId: data.caller_id,
+      receiverId: data.receiver_id,
+      callType: data.call_type,
+      callStatus: data.call_status,
+      durationSeconds: data.duration_seconds,
+      createdAt: data.started_at
+    };
   },
 
   async getCallHistory(userId) {
-    try {
-      if (userId) {
-        const { data, error } = await supabase
-          .from('calls')
-          .select('*, caller:caller_id(id, username, user_profiles(*)), receiver:receiver_id(id, username, user_profiles(*))')
-          .or(`caller_id.eq.${userId},receiver_id.eq.${userId}`)
-          .order('created_at', { ascending: false });
+    if (!isUuid(userId)) return [];
 
-        if (!error && data && data.length > 0) {
-          return data.map(c => {
-            const isCaller = c.caller_id === userId;
-            const partner = isCaller ? c.receiver : c.caller;
-            return {
-              id: c.id,
-              callerId: c.caller_id,
-              receiverId: c.receiver_id,
-              partnerId: partner?.id || (isCaller ? c.receiver_id : c.caller_id),
-              partnerName: partner?.user_profiles?.display_name || partner?.username || 'GOSH Connection',
-              partnerAvatar: partner?.user_profiles?.avatar_url,
-              callType: c.call_type || c.callType,
-              direction: isCaller ? 'outgoing' : 'incoming',
-              status: c.status || c.call_status || c.callStatus,
-              durationSeconds: c.duration_seconds || c.durationSeconds || 0,
-              createdAt: c.created_at || c.createdAt
-            };
-          });
-        }
-      }
-    } catch (e) {}
+    const { data, error } = await supabase
+      .from('calls')
+      .select('*, caller:caller_id(id, username, user_profiles(*)), receiver:receiver_id(id, username, user_profiles(*))')
+      .or(`caller_id.eq.${userId},receiver_id.eq.${userId}`)
+      .order('started_at', { ascending: false });
 
-    // Fallback store
-    if (!fallbackStore.calls) fallbackStore.calls = [];
-    const callsList = userId
-      ? fallbackStore.calls.filter(c => c.callerId === userId || c.receiverId === userId)
-      : fallbackStore.calls;
+    assertNoError(error, 'getCallHistory failed');
 
-    return callsList.map(c => {
-      const isCaller = c.callerId === userId;
-      const partnerId = isCaller ? c.receiverId : c.callerId;
-      const partnerUser = (fallbackStore.users || []).find(u => u.id === partnerId);
-      const partnerProfile = (fallbackStore.profiles || []).find(p => p.user_id === partnerId);
+    return (data || []).map((c) => {
+      const isCaller = c.caller_id === userId;
+      const caller = Array.isArray(c.caller) ? c.caller[0] : c.caller;
+      const receiver = Array.isArray(c.receiver) ? c.receiver[0] : c.receiver;
+      const partner = isCaller ? receiver : caller;
+      const partnerProf = normalizeProfileJoin(partner?.user_profiles);
 
       return {
         id: c.id,
-        callerId: c.callerId,
-        receiverId: c.receiverId,
-        partnerId: partnerId,
-        partnerName: partnerProfile?.display_name || partnerUser?.username || c.partnerName || 'Soul Connection ✨',
-        partnerAvatar: partnerProfile?.avatar_url || c.partnerAvatar,
-        callType: c.callType || 'audio',
+        callerId: c.caller_id,
+        receiverId: c.receiver_id,
+        partnerId: partner?.id || (isCaller ? c.receiver_id : c.caller_id),
+        partnerName: partnerProf?.display_name || partner?.username || 'GOSH Connection',
+        partnerAvatar: partnerProf?.avatar_url || null,
+        callType: c.call_type,
         direction: isCaller ? 'outgoing' : 'incoming',
-        status: c.callStatus || c.status || 'ended',
-        durationSeconds: c.durationSeconds || 0,
-        createdAt: c.createdAt || new Date().toISOString()
+        status: c.call_status,
+        durationSeconds: c.duration_seconds || 0,
+        createdAt: c.started_at
       };
     });
   },
 
   // =========================================================================
-  // CONTACTS & CONNECTIONS
+  // CONTACTS
   // =========================================================================
   async getContacts(userId) {
-    try {
-      const { data, error } = await supabase
-        .from('contacts')
-        .select('*, contact_user:contact_user_id(id, email, username, mobile_number, user_profiles(*))')
-        .eq('user_id', userId);
+    if (!isUuid(userId)) return [];
 
-      if (!error && data && data.length > 0) {
-        return data.map((c) => ({
-          contactId: c.id,
-          userId: c.contact_user?.id,
-          email: c.contact_user?.email,
-          username: c.contact_user?.username,
-          mobileNumber: c.contact_user?.mobile_number,
-          displayName: c.contact_user?.user_profiles?.display_name || c.contact_user?.username,
-          avatarUrl: c.contact_user?.user_profiles?.avatar_url,
-          bio: c.contact_user?.user_profiles?.bio,
-          onlineStatus: c.contact_user?.user_profiles?.online_status,
-          lastSeen: c.contact_user?.user_profiles?.last_seen,
-          nickname: c.nickname,
-          isFavorite: c.is_favorite
-        }));
-      }
-    } catch (e) {}
+    const { data, error } = await supabase
+      .from('contacts')
+      .select('*, contact_user:contact_user_id(id, username, user_profiles(*))')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
 
-    // Fallback store
-    if (!fallbackStore.contacts) fallbackStore.contacts = [];
-    const userContacts = fallbackStore.contacts.filter((c) => c.user_id === userId);
-    return userContacts.map((c) => {
-      const targetUser = fallbackStore.users.find((u) => u.id === c.contact_user_id);
-      const targetProfile = fallbackStore.profiles.find((p) => p.user_id === c.contact_user_id);
+    assertNoError(error, 'getContacts failed');
+
+    return (data || []).map((c) => {
+      const cu = Array.isArray(c.contact_user) ? c.contact_user[0] : c.contact_user;
+      const prof = normalizeProfileJoin(cu?.user_profiles);
       return {
         contactId: c.id,
-        userId: c.contact_user_id,
-        email: targetUser?.email,
-        username: targetUser?.username,
-        mobileNumber: targetUser?.mobile_number,
-        displayName: targetProfile?.display_name || targetUser?.username,
-        avatarUrl: targetProfile?.avatar_url,
-        bio: targetProfile?.bio,
-        onlineStatus: targetProfile?.online_status || false,
-        lastSeen: targetProfile?.last_seen || 'Recently active',
+        userId: cu?.id || c.contact_user_id,
+        username: cu?.username,
+        displayName: prof?.display_name || cu?.username || 'Soul Contact',
+        avatarUrl: prof?.avatar_url || null,
+        bio: prof?.bio || null,
+        onlineStatus: Boolean(prof?.online_status),
+        lastSeen: prof?.last_seen || null,
         nickname: c.nickname,
-        isFavorite: c.is_favorite
+        isFavorite: Boolean(c.is_favorite)
       };
     });
   },
 
   async isContact(userId, targetUserId) {
-    if (!userId || !targetUserId) return false;
-    if (userId === targetUserId) return true; // Self messaging allowed
+    if (!isUuid(userId) || !isUuid(targetUserId)) return false;
+    if (userId === targetUserId) return true;
 
-    // Allow default partner demo in starter mode
-    if (targetUserId === 'partner-demo' || userId === 'partner-demo') return true;
+    const { data, error } = await supabase
+      .from('contacts')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('contact_user_id', targetUserId)
+      .maybeSingle();
 
-    try {
-      const { data, error } = await supabase
-        .from('contacts')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('contact_user_id', targetUserId)
-        .maybeSingle();
-
-      if (!error && data) {
-        return true;
-      }
-    } catch (e) {}
-
-    // Fallback store
-    if (!fallbackStore.contacts) fallbackStore.contacts = [];
-    return fallbackStore.contacts.some(
-      (c) => c.user_id === userId && c.contact_user_id === targetUserId
-    );
+    assertNoError(error, 'isContact failed');
+    return Boolean(data);
   },
 
   async addContact(userId, contactUserId, nickname = null) {
-    try {
-      await supabase
-        .from('contacts')
-        .upsert([{ user_id: userId, contact_user_id: contactUserId, nickname }], {
-          onConflict: 'user_id,contact_user_id'
-        });
-    } catch (e) {}
-
-    if (!fallbackStore.contacts) fallbackStore.contacts = [];
-    const existing = fallbackStore.contacts.find((c) => c.user_id === userId && c.contact_user_id === contactUserId);
-    if (!existing) {
-      fallbackStore.contacts.push({
-        id: 'cnt-' + Date.now(),
-        user_id: userId,
-        contact_user_id: contactUserId,
-        nickname,
-        is_favorite: false,
-        created_at: new Date().toISOString()
-      });
-    } else {
-      if (nickname) existing.nickname = nickname;
+    if (!isUuid(userId) || !isUuid(contactUserId)) {
+      throw new Error('Valid userId and contactUserId UUIDs required.');
     }
-    persistFallback();
+    if (userId === contactUserId) {
+      throw new Error('You cannot add yourself as a contact.');
+    }
+
+    const { error } = await supabase
+      .from('contacts')
+      .upsert(
+        [{
+          id: crypto.randomUUID(),
+          user_id: userId,
+          contact_user_id: contactUserId,
+          nickname: nickname || null
+        }],
+        { onConflict: 'user_id,contact_user_id' }
+      );
+
+    assertNoError(error, 'addContact failed');
     return true;
   },
 
   async updateContact(userId, contactUserId, nickname) {
-    try {
-      await supabase
-        .from('contacts')
-        .update({ nickname })
-        .eq('user_id', userId)
-        .eq('contact_user_id', contactUserId);
-    } catch (e) {}
-
-    if (!fallbackStore.contacts) fallbackStore.contacts = [];
-    const existing = fallbackStore.contacts.find((c) => c.user_id === userId && c.contact_user_id === contactUserId);
-    if (existing) {
-      existing.nickname = nickname;
-      persistFallback();
+    if (!isUuid(userId) || !isUuid(contactUserId)) {
+      throw new Error('Valid userId and contactUserId UUIDs required.');
     }
+
+    const { error } = await supabase
+      .from('contacts')
+      .update({ nickname: nickname || null })
+      .eq('user_id', userId)
+      .eq('contact_user_id', contactUserId);
+
+    assertNoError(error, 'updateContact failed');
     return true;
   },
 
   async removeContact(userId, contactUserId) {
-    try {
-      await supabase
-        .from('contacts')
-        .delete()
-        .eq('user_id', userId)
-        .eq('contact_user_id', contactUserId);
-    } catch (e) {}
+    if (!isUuid(userId) || !isUuid(contactUserId)) {
+      throw new Error('Valid userId and contactUserId UUIDs required.');
+    }
 
-    if (!fallbackStore.contacts) fallbackStore.contacts = [];
-    fallbackStore.contacts = fallbackStore.contacts.filter(
-      (c) => !(c.user_id === userId && c.contact_user_id === contactUserId)
-    );
-    persistFallback();
+    const { error } = await supabase
+      .from('contacts')
+      .delete()
+      .eq('user_id', userId)
+      .eq('contact_user_id', contactUserId);
+
+    assertNoError(error, 'removeContact failed');
     return true;
   },
 
@@ -800,101 +1389,102 @@ export const db = {
   // BLOCKED USERS
   // =========================================================================
   async getBlockedUsers(userId) {
-    try {
-      const { data } = await supabase
-        .from('blocked_users')
-        .select('*, blocked_user:blocked_user_id(id, email, username, user_profiles(display_name, avatar_url))')
-        .eq('user_id', userId);
+    if (!isUuid(userId)) return [];
 
-      if (data) return data;
-    } catch (e) {}
+    const { data, error } = await supabase
+      .from('blocked_users')
+      .select('*, blocked_user:blocked_user_id(id, username, user_profiles(display_name, avatar_url))')
+      .eq('user_id', userId);
 
-    if (!fallbackStore.blocked_users) fallbackStore.blocked_users = [];
-    return fallbackStore.blocked_users.filter((b) => b.user_id === userId);
+    assertNoError(error, 'getBlockedUsers failed');
+    return data || [];
   },
 
   async blockUser(userId, blockedUserId) {
-    try {
-      await supabase
-        .from('blocked_users')
-        .insert([{ user_id: userId, blocked_user_id: blockedUserId }]);
-    } catch (e) {}
-
-    if (!fallbackStore.blocked_users) fallbackStore.blocked_users = [];
-    const exists = fallbackStore.blocked_users.find(
-      (b) => b.user_id === userId && b.blocked_user_id === blockedUserId
-    );
-    if (!exists) {
-      fallbackStore.blocked_users.push({
-        id: 'blk-' + Date.now(),
-        user_id: userId,
-        blocked_user_id: blockedUserId,
-        created_at: new Date().toISOString()
-      });
-      persistFallback();
+    if (!isUuid(userId) || !isUuid(blockedUserId)) {
+      throw new Error('Valid UUIDs required to block user.');
     }
+
+    const { error } = await supabase
+      .from('blocked_users')
+      .upsert(
+        [{ id: crypto.randomUUID(), user_id: userId, blocked_user_id: blockedUserId }],
+        { onConflict: 'user_id,blocked_user_id' }
+      );
+
+    assertNoError(error, 'blockUser failed');
     return true;
   },
 
   async unblockUser(userId, blockedUserId) {
-    try {
-      await supabase
-        .from('blocked_users')
-        .delete()
-        .eq('user_id', userId)
-        .eq('blocked_user_id', blockedUserId);
-    } catch (e) {}
+    if (!isUuid(userId) || !isUuid(blockedUserId)) {
+      throw new Error('Valid UUIDs required to unblock user.');
+    }
 
-    if (!fallbackStore.blocked_users) fallbackStore.blocked_users = [];
-    fallbackStore.blocked_users = fallbackStore.blocked_users.filter(
-      (b) => !(b.user_id === userId && b.blocked_user_id === blockedUserId)
-    );
-    persistFallback();
+    const { error } = await supabase
+      .from('blocked_users')
+      .delete()
+      .eq('user_id', userId)
+      .eq('blocked_user_id', blockedUserId);
+
+    assertNoError(error, 'unblockUser failed');
     return true;
   },
 
   async isUserBlocked(userAId, userBId) {
-    if (!fallbackStore.blocked_users) fallbackStore.blocked_users = [];
-    return fallbackStore.blocked_users.some(
-      (b) =>
-        (b.user_id === userAId && b.blocked_user_id === userBId) ||
-        (b.user_id === userBId && b.blocked_user_id === userAId)
-    );
+    if (!isUuid(userAId) || !isUuid(userBId)) return false;
+
+    const { data, error } = await supabase
+      .from('blocked_users')
+      .select('id')
+      .or(`and(user_id.eq.${userAId},blocked_user_id.eq.${userBId}),and(user_id.eq.${userBId},blocked_user_id.eq.${userAId})`)
+      .limit(1)
+      .maybeSingle();
+
+    assertNoError(error, 'isUserBlocked failed');
+    return Boolean(data);
   },
 
   // =========================================================================
   // END-TO-END ENCRYPTION (E2EE PUBLIC KEYS)
   // =========================================================================
   async savePublicKey(userId, publicKey) {
-    try {
-      await supabase.from('encryption_keys').upsert([{
-        user_id: userId,
-        public_key: publicKey,
-        updated_at: new Date().toISOString()
-      }], { onConflict: 'user_id' });
-    } catch (e) {}
+    if (!isUuid(userId)) throw new Error('Valid userId UUID required for public key.');
 
-    if (!fallbackStore.public_keys) fallbackStore.public_keys = {};
-    fallbackStore.public_keys[userId] = publicKey;
-    persistFallback();
+    let parsedKey = publicKey;
+    if (typeof publicKey === 'string') {
+      try {
+        parsedKey = JSON.parse(publicKey);
+      } catch {
+        parsedKey = { raw: publicKey };
+      }
+    }
+
+    const { error } = await supabase.from('encryption_keys').upsert(
+      [{
+        id: crypto.randomUUID(),
+        user_id: userId,
+        public_key: parsedKey,
+        updated_at: new Date().toISOString()
+      }],
+      { onConflict: 'user_id' }
+    );
+
+    assertNoError(error, 'savePublicKey failed');
     return true;
   },
 
   async getPublicKey(userId) {
-    try {
-      const { data, error } = await supabase
-        .from('encryption_keys')
-        .select('public_key')
-        .eq('user_id', userId)
-        .maybeSingle();
+    if (!isUuid(userId)) return null;
 
-      if (!error && data?.public_key) {
-        return data.public_key;
-      }
-    } catch (e) {}
+    const { data, error } = await supabase
+      .from('encryption_keys')
+      .select('public_key')
+      .eq('user_id', userId)
+      .maybeSingle();
 
-    if (!fallbackStore.public_keys) fallbackStore.public_keys = {};
-    return fallbackStore.public_keys[userId] || null;
+    assertNoError(error, 'getPublicKey failed');
+    return data?.public_key || null;
   },
 
   // =========================================================================
@@ -915,123 +1505,104 @@ export const db = {
       hasPasscode: false
     };
 
-    try {
-      const { data, error } = await supabase
-        .from('user_settings')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
+    if (!isUuid(userId)) return defaultSettings;
 
-      if (!error && data) {
-        return {
-          ...defaultSettings,
-          ...data,
-          hasPasscode: !!data.passcode_hash
-        };
-      }
-    } catch (e) {}
+    const { data, error } = await supabase
+      .from('user_settings')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
 
-    if (!fallbackStore.settings) fallbackStore.settings = [];
-    const found = fallbackStore.settings.find(s => s.userId === userId || s.user_id === userId);
-    if (found) {
-      return {
-        ...defaultSettings,
-        ...found,
-        hasPasscode: !!found.passcodeHash
-      };
-    }
+    assertNoError(error, 'getUserSettings failed');
+    if (!data) return defaultSettings;
 
-    return defaultSettings;
+    return {
+      ...defaultSettings,
+      theme: data.theme || defaultSettings.theme,
+      soundEnabled: data.sound_enabled ?? defaultSettings.soundEnabled,
+      notificationsEnabled: data.notifications_enabled ?? defaultSettings.notificationsEnabled,
+      lastSeenPrivacy: data.last_seen_privacy || defaultSettings.lastSeenPrivacy,
+      profilePhotoPrivacy: data.profile_photo_visibility || defaultSettings.profilePhotoPrivacy,
+      statusPrivacy: data.status_privacy || defaultSettings.statusPrivacy,
+      readReceipts: data.read_receipts_enabled ?? defaultSettings.readReceipts,
+      hasPasscode: Boolean(data.passcode_hash)
+    };
   },
 
   async updateUserSettings(userId, newSettings) {
-    if (!fallbackStore.settings) fallbackStore.settings = [];
-    let existingIndex = fallbackStore.settings.findIndex(s => s.userId === userId || s.user_id === userId);
+    if (!isUuid(userId)) throw new Error('Valid userId UUID required for settings.');
 
     let passcodeHash = null;
     if (newSettings.passcode) {
       passcodeHash = crypto.createHash('sha256').update(newSettings.passcode).digest('hex');
     }
 
-    const updated = {
-      ...(existingIndex >= 0 ? fallbackStore.settings[existingIndex] : {}),
-      userId,
-      ...newSettings,
-      updatedAt: new Date().toISOString()
+    const row = {
+      user_id: userId,
+      updated_at: new Date().toISOString()
     };
 
+    if (newSettings.theme !== undefined) row.theme = newSettings.theme;
+    if (newSettings.soundEnabled !== undefined) row.sound_enabled = Boolean(newSettings.soundEnabled);
+    if (newSettings.notificationsEnabled !== undefined) {
+      row.notifications_enabled = Boolean(newSettings.notificationsEnabled);
+    }
+    if (newSettings.lastSeenPrivacy !== undefined) row.last_seen_privacy = newSettings.lastSeenPrivacy;
+    if (newSettings.profilePhotoPrivacy !== undefined) {
+      row.profile_photo_visibility = newSettings.profilePhotoPrivacy;
+    }
+    if (newSettings.statusPrivacy !== undefined) row.status_privacy = newSettings.statusPrivacy;
+    if (newSettings.readReceipts !== undefined) row.read_receipts_enabled = Boolean(newSettings.readReceipts);
     if (passcodeHash) {
-      updated.passcodeHash = passcodeHash;
-      delete updated.passcode;
+      row.passcode_hash = passcodeHash;
+      row.passcode_vault_enabled = true;
     }
 
-    if (existingIndex >= 0) {
-      fallbackStore.settings[existingIndex] = updated;
-    } else {
-      fallbackStore.settings.push(updated);
-    }
-    persistFallback();
+    const { error } = await supabase
+      .from('user_settings')
+      .upsert([row], { onConflict: 'user_id' });
 
-    try {
-      await supabase.from('user_settings').upsert([{
-        user_id: userId,
-        theme: updated.theme,
-        sound_enabled: updated.soundEnabled,
-        notifications_enabled: updated.notificationsEnabled,
-        call_ringtone_enabled: updated.callRingtoneEnabled,
-        last_seen_privacy: updated.lastSeenPrivacy,
-        profile_photo_privacy: updated.profilePhotoPrivacy,
-        about_privacy: updated.aboutPrivacy,
-        status_privacy: updated.statusPrivacy,
-        read_receipts: updated.readReceipts,
-        ...(passcodeHash ? { passcode_hash: passcodeHash } : {}),
-        updated_at: new Date().toISOString()
-      }], { onConflict: 'user_id' });
-    } catch (e) {}
-
-    return { ...updated, hasPasscode: !!updated.passcodeHash };
+    assertNoError(error, 'updateUserSettings failed');
+    return this.getUserSettings(userId);
   },
 
   async verifyUserPasscode(userId, passcode) {
-    if (!passcode) return false;
+    if (!passcode || !isUuid(userId)) return false;
     const hash = crypto.createHash('sha256').update(passcode).digest('hex');
 
-    try {
-      const { data, error } = await supabase
-        .from('user_settings')
-        .select('passcode_hash')
-        .eq('user_id', userId)
-        .maybeSingle();
+    const { data, error } = await supabase
+      .from('user_settings')
+      .select('passcode_hash')
+      .eq('user_id', userId)
+      .maybeSingle();
 
-      if (!error && data?.passcode_hash) {
-        return data.passcode_hash === hash;
-      }
-    } catch (e) {}
+    assertNoError(error, 'verifyUserPasscode failed');
+    if (!data?.passcode_hash) return false;
 
-    if (!fallbackStore.settings) fallbackStore.settings = [];
-    const found = fallbackStore.settings.find(s => s.userId === userId || s.user_id === userId);
-    return found?.passcodeHash === hash;
+    const a = Buffer.from(data.passcode_hash, 'utf8');
+    const b = Buffer.from(hash, 'utf8');
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
   },
 
   // =========================================================================
   // ONLINE PRESENCE & LAST SEEN
   // =========================================================================
   async updateOnlinePresence(userId, isOnline, lastSeen = null) {
-    const updateData = {
-      online_status: isOnline,
-      last_seen: lastSeen || new Date().toISOString()
-    };
+    if (!isUuid(userId)) return false;
 
-    try {
-      await supabase.from('user_profiles').update(updateData).eq('user_id', userId);
-    } catch (e) {}
+    const validIsoTimestamp =
+      lastSeen && !Number.isNaN(Date.parse(lastSeen)) ? new Date(lastSeen).toISOString() : new Date().toISOString();
 
-    const prof = fallbackStore.profiles.find((p) => p.user_id === userId);
-    if (prof) {
-      prof.online_status = isOnline;
-      prof.last_seen = updateData.last_seen;
-      persistFallback();
-    }
+    const { error } = await supabase
+      .from('user_profiles')
+      .update({
+        online_status: Boolean(isOnline),
+        last_seen: validIsoTimestamp,
+        updated_at: new Date().toISOString()
+      })
+      .eq('user_id', userId);
+
+    assertNoError(error, 'updateOnlinePresence failed');
     return true;
   }
 };

@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import conversationController from '../controllers/conversationController.js';
-import { optionalAuth } from '../middleware/authMiddleware.js';
+import { authenticateToken } from '../middleware/authMiddleware.js';
 
 const router = Router();
 
-router.get('/', optionalAuth, conversationController.getConversations);
-router.post('/', optionalAuth, conversationController.createConversation);
-router.post('/group', optionalAuth, conversationController.createGroup);
+router.get('/', authenticateToken, conversationController.getConversations);
+router.post('/', authenticateToken, conversationController.createConversation);
+router.post('/group', authenticateToken, conversationController.createGroup);
 
 export default router;

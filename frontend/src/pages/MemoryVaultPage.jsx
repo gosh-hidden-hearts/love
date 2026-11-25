@@ -56,58 +56,16 @@ export default function MemoryVaultPage() {
 
   const loadMemories = async () => {
     try {
-      const res = await api.getMemories(user?.id);
+      const res = await api.getMemories();
       if (res.memories && res.memories.length > 0) {
         setMemories(res.memories);
-        // Collect custom albums from memories
         const loadedAlbums = new Set(ALBUM_PRESETS);
         res.memories.forEach(m => {
           if (m.album) loadedAlbums.add(m.album);
         });
         setAlbums(Array.from(loadedAlbums));
       } else {
-        // Romantic demo vault items
-        setMemories([
-          {
-            id: 'mem-1',
-            fileName: 'Sunset_By_The_Harbor.jpg',
-            fileType: 'photo',
-            fileSize: 2450000,
-            megaDownloadUrl: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=1000&auto=format&fit=crop&q=80',
-            caption: 'The moment we watched the sky turn gold together ✨',
-            memoryDate: '2026-10-14',
-            feelingsTag: 'Heartfelt ❤️',
-            album: 'Adventures & Trips',
-            uploaderName: 'Soul Heart Partner',
-            createdAt: new Date(Date.now() - 3600000 * 48).toISOString()
-          },
-          {
-            id: 'mem-2',
-            fileName: 'First_Coffee_Meeting.jpg',
-            fileType: 'photo',
-            fileSize: 1800000,
-            megaDownloadUrl: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=1000&auto=format&fit=crop&q=80',
-            caption: 'Our table by the window at Cafe Reverie ☕',
-            memoryDate: '2026-08-20',
-            feelingsTag: 'First Date ☕',
-            album: 'First Impressions',
-            uploaderName: 'You',
-            createdAt: new Date(Date.now() - 3600000 * 120).toISOString()
-          },
-          {
-            id: 'mem-3',
-            fileName: 'A_Lover_Secret_Note.txt',
-            fileType: 'document',
-            fileSize: 4200,
-            megaDownloadUrl: '#',
-            caption: 'A letter written at 2:00 AM under the stars 💌',
-            memoryDate: '2026-11-01',
-            feelingsTag: 'Secret Note 💌',
-            album: 'Secret Love Letters',
-            uploaderName: 'Soul Heart Partner',
-            createdAt: new Date(Date.now() - 3600000 * 240).toISOString()
-          }
-        ]);
+        setMemories([]);
       }
     } catch (err) {
       console.warn(err);
@@ -150,23 +108,12 @@ export default function MemoryVaultPage() {
       formData.append('fileType', fileType);
 
       const res = await api.uploadMemory(formData);
+      if (!res?.success || !res?.memory) {
+        alert(res?.message || 'Memory upload failed.');
+        return;
+      }
 
-      // Local optimistic update
-      const newMemory = {
-        id: res.memory?.id || 'mem-' + Date.now(),
-        fileName: selectedFile.name,
-        fileType,
-        fileSize: selectedFile.size,
-        megaDownloadUrl: res.memory?.megaDownloadUrl || previewUrl,
-        caption,
-        memoryDate,
-        feelingsTag: selectedTag,
-        album: targetAlbum,
-        uploaderName: user?.displayName || 'You',
-        createdAt: new Date().toISOString()
-      };
-
-      setMemories((prev) => [newMemory, ...prev]);
+      setMemories((prev) => [res.memory, ...prev]);
       setShowUploadModal(false);
       setSelectedFile(null);
       setPreviewUrl(null);

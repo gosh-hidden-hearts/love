@@ -23,7 +23,7 @@ import logoImg from '../assets/logo.png';
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, login, loginWithOtp, loginWithGoogle, loginWithGoogleRedirect } = useAuth();
+  const { user, login, loginWithOtp, loginWithGoogle, loginWithGoogleRedirect, resetPassword } = useAuth();
 
   // If already authenticated or becomes authenticated, redirect to /chats immediately
   useEffect(() => {
@@ -247,21 +247,21 @@ export default function LoginPage() {
 
   const handleResetPasswordSubmit = async (e) => {
     e.preventDefault();
-    if (newPassword.length < 6) {
-      setForgotMsg({ text: 'Password must be at least 6 characters.', type: 'error' });
-      return;
-    }
     setForgotLoading(true);
     try {
-      const res = await api.resetPasswordWithOtp(resolvedForgotEmail, forgotOtp.trim(), newPassword);
+      const res = await api.resetPasswordWithOtp(resolvedForgotEmail, forgotOtp.trim());
       if (res.success) {
-        setForgotMsg({ text: 'Password reset successful! You can now log in.', type: 'success' });
+        await resetPassword(resolvedForgotEmail);
+        setForgotMsg({
+          text: `OTP verified! A Firebase password reset email has been sent to ${resolvedForgotEmail}.`,
+          type: 'success'
+        });
         setTimeout(() => {
           setShowForgotModal(false);
           setForgotStep(1);
-        }, 2000);
+        }, 2500);
       } else {
-        throw new Error(res.message || 'Password update failed.');
+        throw new Error(res.message || 'Password reset verification failed.');
       }
     } catch (err) {
       setForgotMsg({ text: 'Could not reset password: ' + err.message, type: 'error' });
@@ -690,7 +690,7 @@ export default function LoginPage() {
             <p className="text-xs text-slate-400 mb-4">
               {forgotStep === 1 && 'Enter your registered email, username, or mobile to receive a 6-digit OTP.'}
               {forgotStep === 2 && 'Enter the 6-digit OTP code sent via Google SMTP.'}
-              {forgotStep === 3 && 'Create a new secure password for your GOSH account.'}
+              {forgotStep === 3 && 'Click below to send a secure Firebase password reset link to your email.'}
             </p>
 
             {forgotMsg.text && (
@@ -761,21 +761,16 @@ export default function LoginPage() {
 
             {forgotStep === 3 && (
               <form onSubmit={handleResetPasswordSubmit} className="space-y-4">
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Enter new password (min 6 chars)"
-                  className="w-full px-4 py-3 rounded-xl glass-input text-sm text-white placeholder-slate-500 focus:outline-none"
-                  required
-                />
+                <p className="text-xs text-slate-300 bg-white/5 p-3 rounded-xl border border-white/10">
+                  Your identity is verified for <span className="text-rose-300 font-medium">{resolvedForgotEmail}</span>. Send a Firebase password reset link to set your new password.
+                </p>
                 <div className="flex gap-3 justify-end pt-2">
                   <button
                     type="submit"
                     disabled={forgotLoading}
                     className="px-5 py-2.5 rounded-xl btn-romantic-primary text-xs font-medium"
                   >
-                    {forgotLoading ? 'Updating...' : 'Set New Password'}
+                    {forgotLoading ? 'Sending Reset Link...' : 'Send Password Reset Email'}
                   </button>
                 </div>
               </form>

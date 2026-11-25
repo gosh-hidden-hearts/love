@@ -6,28 +6,42 @@ class SocketService {
     this.currentUser = null;
   }
 
+  getSocketServerUrl() {
+    const customOverride = typeof localStorage !== 'undefined' ? localStorage.getItem('gosh_backend_url') : null;
+    const customSocketUrl = customOverride || import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_API_URL;
+    if (customSocketUrl && customSocketUrl.trim().length > 0) {
+      return customSocketUrl.trim().replace(/\/api\/?$/, '').replace(/\/+$/, '');
+    }
+    if (typeof window !== 'undefined') {
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        return 'http://localhost:5000';
+      }
+    }
+    return null;
+  }
+
   connect(user) {
+    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('gosh_jwt_token') : null;
+    if (!token || !user?.id) {
+      return null;
+    }
+
     if (this.socket && this.socket.connected) {
       if (this.currentUser?.id === user?.id) return this.socket;
       this.disconnect();
     }
 
-    this.currentUser = user;
-
-    // Check if on a static hosting environment like GitHub Pages without an explicit backend
-    const isGitHubPages = typeof window !== 'undefined' && window.location.hostname.endsWith('github.io');
-    const customOverride = typeof localStorage !== 'undefined' ? localStorage.getItem('gosh_backend_url') : null;
-    const customSocketUrl = customOverride || import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_API_URL;
-
-    if (isGitHubPages && !customSocketUrl) {
-      console.info('ℹ️ Running on GitHub Pages without VITE_SOCKET_URL. Socket connections paused until live backend is connected.');
+    const serverUrl = this.getSocketServerUrl();
+    if (!serverUrl) {
+      console.info('ℹ️ No backend Socket URL configured (VITE_SOCKET_URL). Realtime socket paused.');
       return null;
     }
 
-    const serverUrl = customSocketUrl || (typeof window !== 'undefined' && window.location.hostname === 'localhost' ? 'http://localhost:5000' : window.location.origin);
+    this.currentUser = user;
 
     this.socket = io(serverUrl, {
       transports: ['websocket', 'polling'],
+      auth: { token },
       autoConnect: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 1000
@@ -37,11 +51,14 @@ class SocketService {
       console.log('⚡ Connected to GOSH Realtime Server. Socket ID:', this.socket.id);
       if (user) {
         this.socket.emit('user_online', {
-          userId: user.id || user.uid,
           displayName: user.displayName || user.email?.split('@')[0],
           avatarUrl: user.avatarUrl || user.photoURL
         });
       }
+    });
+
+    this.socket.on('connect_error', (err) => {
+      console.warn('Socket connection error:', err.message);
     });
 
     this.socket.on('disconnect', (reason) => {

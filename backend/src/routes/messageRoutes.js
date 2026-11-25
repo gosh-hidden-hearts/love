@@ -1,21 +1,20 @@
 import { Router } from 'express';
 import multer from 'multer';
 import messageController from '../controllers/messageController.js';
-import { optionalAuth } from '../middleware/authMiddleware.js';
+import { authenticateToken } from '../middleware/authMiddleware.js';
 
-// Memory storage buffers file in memory for direct encrypted streaming to MEGA Cloud Storage
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 100 * 1024 * 1024 } // 100MB limit
+  limits: { fileSize: 100 * 1024 * 1024 }
 });
 
 const router = Router();
 
-router.get('/:conversationId', optionalAuth, messageController.getMessages);
-router.post('/', optionalAuth, messageController.sendMessage);
-router.post('/upload', optionalAuth, upload.single('file'), messageController.uploadAttachment);
-router.post('/:messageId/reaction', optionalAuth, messageController.reactToMessage);
-router.delete('/:messageId', optionalAuth, messageController.deleteMessage);
+router.get('/:conversationId', authenticateToken, messageController.getMessages);
+router.post('/', authenticateToken, messageController.sendMessage);
+router.post('/upload', authenticateToken, upload.single('file'), messageController.uploadAttachment);
+router.post('/:messageId/reaction', authenticateToken, messageController.reactToMessage);
+router.delete('/:messageId', authenticateToken, messageController.deleteMessage);
 
 export default router;

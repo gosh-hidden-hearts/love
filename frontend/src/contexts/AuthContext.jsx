@@ -1,16 +1,16 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { 
-  auth, 
+import {
+  auth,
   googleProvider,
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  signInWithPopup, 
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
-  signOut, 
+  signOut,
   sendPasswordResetEmail,
   updateProfile,
-  onAuthStateChanged 
+  onAuthStateChanged
 } from '../services/firebase';
 import api from '../services/api';
 import socketService from '../services/socket';
@@ -18,19 +18,28 @@ import encryptionService from '../services/encryptionService';
 
 const AuthContext = createContext(null);
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export const buildUserObject = (firebaseUser, backendUser = null, backendProfile = null) => {
-  const uid = firebaseUser?.uid || backendUser?.firebase_uid || backendUser?.id || '';
-  const email = firebaseUser?.email || backendUser?.email || '';
+  const uid = firebaseUser?.uid || backendUser?.firebase_uid || '';
+  const email = backendUser?.email || firebaseUser?.email || '';
   const fallbackName = email ? email.split('@')[0] : 'Soul Partner';
   const displayName = backendProfile?.display_name || firebaseUser?.displayName || backendUser?.username || fallbackName;
-  const username = backendUser?.username || firebaseUser?.displayName?.toLowerCase().replace(/\s+/g, '_') || fallbackName.toLowerCase().replace(/\s+/g, '_');
+  const username =
+    backendUser?.username ||
+    firebaseUser?.displayName?.toLowerCase().replace(/[^a-z0-9_]/g, '_') ||
+    fallbackName.toLowerCase().replace(/[^a-z0-9_]/g, '_');
   const mobile = backendUser?.mobile_number || '';
-  const avatarUrl = backendProfile?.avatar_url || firebaseUser?.photoURL || `https://api.dicebear.com/7.x/adventurer/svg?seed=${uid || 'GOSH'}`;
+  const avatarUrl =
+    backendProfile?.avatar_url ||
+    firebaseUser?.photoURL ||
+    `https://api.dicebear.com/7.x/adventurer/svg?seed=${uid || 'GOSH'}`;
   const bio = backendProfile?.bio || 'In a love story written by the stars ✨';
   const relationshipStatus = backendProfile?.relationship_status || 'In a soul bond';
 
   return {
     id: backendUser?.id || uid,
+    supabaseSynced: Boolean(backendUser?.id && UUID_REGEX.test(backendUser.id)),
     uid,
     email,
     displayName,
@@ -60,14 +69,46 @@ export const AuthProvider = ({ children }) => {
     }
   });
   const [loading, setLoading] = useState(true);
+  const [syncError, setSyncError] = useState(null);
   const [termsAccepted, setTermsAccepted] = useState(() => {
     return localStorage.getItem('gosh_terms_accepted') === 'true';
   });
   const [isVaultLocked, setIsVaultLocked] = useState(true);
 
-  // Sync profile when auth state changes & handle redirect results
+  const persistSessionState = (userObj, profileObj) => {
+    setUser(userObj);
+    setProfile(profileObj || userObj);
+    localStorage.setItem('gosh_saved_user', JSON.stringify(userObj));
+    localStorage.setItem('gosh_saved_profile', JSON.stringify(profileObj || userObj));
+  };
+
+  /**
+   * Obtains verified Firebase ID token and synchronizes the user with Backend -> Supabase.
+   */
+  const syncWithBackend = async (firebaseUser, extraMeta = {}) => {
+    const idToken = await firebaseUser.getIdToken();
+    const syncRes = await api.syncUser(idToken, {
+      displayName: extraMeta.displayName || firebaseUser.displayName || firebaseUser.email?.split('@')[0],
+      username: extraMeta.username || null,
+      mobile_number: extraMeta.mobile_number || null,
+      photoURL: firebaseUser.photoURL || null
+    });
+
+    if (!syncRes?.success || !syncRes?.user) {
+      const errMsg = syncRes?.message || 'Failed to synchronize account with Supabase database.';
+      setSyncError(errMsg);
+      return { ok: false, error: errMsg, syncRes };
+    }
+
+    setSyncError(null);
+    const userObj = buildUserObject(firebaseUser, syncRes.user, syncRes.profile);
+    persistSessionState(userObj, syncRes.profile || userObj);
+    socketService.connect(userObj);
+    encryptionService.initUserKeys(userObj.id).catch(console.warn);
+    return { ok: true, userObj, profile: syncRes.profile };
+  };
+
   useEffect(() => {
-    // Process any redirect results from Google Sign-In
     getRedirectResult(auth)
       .then((result) => {
         if (result?.user) {
@@ -80,48 +121,35 @@ export const AuthProvider = ({ children }) => {
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        let userObj = buildUserObject(firebaseUser);
-
-        // Mark terms accepted for authenticated users
         localStorage.setItem('gosh_terms_accepted', 'true');
         setTermsAccepted(true);
 
         try {
-          // Sync with backend / Supabase if backend service is available
-          const syncRes = await api.syncUser({
-            firebaseUid: firebaseUser.uid,
-            email: firebaseUser.email,
-            displayName: userObj.displayName,
-            photoURL: firebaseUser.photoURL
-          });
-
-          if (syncRes && syncRes.user) {
-            userObj = buildUserObject(firebaseUser, syncRes.user, syncRes.profile);
+          const synced = await syncWithBackend(firebaseUser);
+          if (!synced.ok) {
+            const fallbackObj = buildUserObject(firebaseUser);
+            persistSessionState(fallbackObj, fallbackObj);
           }
         } catch (err) {
-          console.warn('Backend sync skipped or offline, continuing with Firebase session:', err?.message || err);
+          const msg = err?.message || 'Backend sync failed.';
+          setSyncError(msg);
+          const fallbackObj = buildUserObject(firebaseUser);
+          persistSessionState(fallbackObj, fallbackObj);
         }
-
-        setUser(userObj);
-        setProfile(userObj);
-        localStorage.setItem('gosh_saved_user', JSON.stringify(userObj));
-        localStorage.setItem('gosh_saved_profile', JSON.stringify(userObj));
-
-        // Connect to real-time socket
-        socketService.connect(userObj);
-
-        // Initialize E2EE Keypair
-        encryptionService.initUserKeys(userObj.id).catch(console.warn);
       } else {
-        // If no Firebase session, check if we have an OTP-authenticated user session
         const token = localStorage.getItem('gosh_jwt_token');
         const savedUser = localStorage.getItem('gosh_saved_user');
+        const savedProfile = localStorage.getItem('gosh_saved_profile');
         if (token && savedUser) {
           try {
-            const parsed = JSON.parse(savedUser);
-            setUser(parsed);
-            socketService.connect(parsed);
-            encryptionService.initUserKeys(parsed.id).catch(console.warn);
+            const parsedUser = JSON.parse(savedUser);
+            const parsedProfile = savedProfile ? JSON.parse(savedProfile) : parsedUser;
+            setUser(parsedUser);
+            setProfile(parsedProfile);
+            if (parsedUser.supabaseSynced) {
+              socketService.connect(parsedUser);
+              encryptionService.initUserKeys(parsedUser.id).catch(console.warn);
+            }
           } catch {
             setUser(null);
             setProfile(null);
@@ -138,7 +166,6 @@ export const AuthProvider = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
-  // Agree and Continue acceptance
   const acceptTerms = async () => {
     try {
       await api.recordTermsAcceptance('1.0.0', '1.0.0');
@@ -149,11 +176,9 @@ export const AuthProvider = ({ children }) => {
     setTermsAccepted(true);
   };
 
-  // Login with Email or Resolved Identifier (Username / Mobile)
   const login = async (identifier, password) => {
     let emailToUse = identifier.trim();
 
-    // If identifier is not standard email, resolve via backend
     if (!identifier.includes('@')) {
       const res = await api.resolveIdentifier(identifier.trim());
       if (!res.success || !res.email) {
@@ -165,194 +190,115 @@ export const AuthProvider = ({ children }) => {
     const credential = await signInWithEmailAndPassword(auth, emailToUse, password);
     const fbUser = credential.user;
 
-    // Immediately set authenticated state synchronously so route guards allow navigation instantly
-    let userObj = buildUserObject(fbUser);
     localStorage.setItem('gosh_terms_accepted', 'true');
     setTermsAccepted(true);
-    setUser(userObj);
-    setProfile(userObj);
-    localStorage.setItem('gosh_saved_user', JSON.stringify(userObj));
-    localStorage.setItem('gosh_saved_profile', JSON.stringify(userObj));
 
-    // Sync in background / await to enrich with backend profile
-    try {
-      const syncRes = await api.syncUser({
-        firebaseUid: fbUser.uid,
-        email: fbUser.email,
-        displayName: userObj.displayName,
-        photoURL: fbUser.photoURL
-      });
-      if (syncRes && syncRes.user) {
-        userObj = buildUserObject(fbUser, syncRes.user, syncRes.profile);
-        setUser(userObj);
-        setProfile(userObj);
-        localStorage.setItem('gosh_saved_user', JSON.stringify(userObj));
-        localStorage.setItem('gosh_saved_profile', JSON.stringify(userObj));
-      }
-    } catch (err) {
-      console.warn('Backend sync deferred or offline:', err?.message || err);
+    const synced = await syncWithBackend(fbUser);
+    if (!synced.ok) {
+      const fallbackObj = buildUserObject(fbUser);
+      persistSessionState(fallbackObj, fallbackObj);
+      return fallbackObj;
     }
-
-    socketService.connect(userObj);
-    encryptionService.initUserKeys(userObj.id).catch(console.warn);
-    return userObj;
+    return synced.userObj;
   };
 
-  // Login via Phone Number / Email + OTP
   const loginWithOtp = async (identifier, otp) => {
     const res = await api.loginWithOtp(identifier, otp);
     if (!res.success) {
       throw new Error(res.message || 'OTP Login failed. Please verify code.');
     }
 
-    const userObj = {
-      id: res.user.id,
-      uid: res.user.firebase_uid || res.user.id,
-      email: res.user.email,
-      displayName: res.profile?.display_name || res.user.username,
-      username: res.user.username,
-      mobile: res.user.mobile_number,
-      avatarUrl: res.profile?.avatar_url || `https://api.dicebear.com/7.x/adventurer/svg?seed=${res.user.id}`,
-      bio: res.profile?.bio || 'In a love story written by the stars ✨',
-      relationshipStatus: res.profile?.relationship_status || 'In a soul bond'
-    };
-
+    const userObj = buildUserObject(null, res.user, res.profile);
+    setSyncError(null);
     localStorage.setItem('gosh_terms_accepted', 'true');
     setTermsAccepted(true);
-    setUser(userObj);
-    setProfile(res.profile || userObj);
-    localStorage.setItem('gosh_saved_user', JSON.stringify(userObj));
-    localStorage.setItem('gosh_saved_profile', JSON.stringify(res.profile || userObj));
+    persistSessionState(userObj, res.profile || userObj);
     socketService.connect(userObj);
     encryptionService.initUserKeys(userObj.id).catch(console.warn);
-
     return userObj;
   };
 
-  // Google OAuth Login with popup and fallback to redirect
   const loginWithGoogle = async () => {
     try {
       const res = await signInWithPopup(auth, googleProvider);
       if (res?.user) {
         const fbUser = res.user;
-        let userObj = buildUserObject(fbUser);
         localStorage.setItem('gosh_terms_accepted', 'true');
         setTermsAccepted(true);
-        setUser(userObj);
-        setProfile(userObj);
-        localStorage.setItem('gosh_saved_user', JSON.stringify(userObj));
-        localStorage.setItem('gosh_saved_profile', JSON.stringify(userObj));
 
-        try {
-          const syncRes = await api.syncUser({
-            firebaseUid: fbUser.uid,
-            email: fbUser.email,
-            displayName: userObj.displayName,
-            photoURL: fbUser.photoURL
-          });
-          if (syncRes && syncRes.user) {
-            userObj = buildUserObject(fbUser, syncRes.user, syncRes.profile);
-            setUser(userObj);
-            setProfile(userObj);
-            localStorage.setItem('gosh_saved_user', JSON.stringify(userObj));
-            localStorage.setItem('gosh_saved_profile', JSON.stringify(userObj));
-          }
-        } catch (syncErr) {
-          console.warn('Backend sync deferred or offline:', syncErr?.message || syncErr);
+        const synced = await syncWithBackend(fbUser);
+        if (!synced.ok) {
+          const fallbackObj = buildUserObject(fbUser);
+          persistSessionState(fallbackObj, fallbackObj);
+          return fallbackObj;
         }
-
-        socketService.connect(userObj);
-        encryptionService.initUserKeys(userObj.id).catch(console.warn);
-        return userObj;
+        return synced.userObj;
       }
       return null;
     } catch (popupErr) {
-      console.warn('Google Popup Sign-in notice:', popupErr.code, popupErr.message);
-
-      // If popup was blocked by browser or mobile webview, automatically fall back to redirect
       if (
         popupErr.code === 'auth/popup-blocked' ||
         popupErr.code === 'auth/cancelled-popup-request' ||
         popupErr.code === 'auth/operation-not-supported-in-this-environment'
       ) {
-        console.log('Popup blocked; falling back to Google Sign-in with redirect...');
         await signInWithRedirect(auth, googleProvider);
         return null;
       }
-
       throw popupErr;
     }
   };
 
-  // Explicit Google OAuth Redirect (Ideal for mobile Safari / Chrome)
   const loginWithGoogleRedirect = async () => {
     await signInWithRedirect(auth, googleProvider);
   };
 
-  // Signup flow
   const signup = async ({ email, password, displayName, username, mobile }) => {
-    // 1. Create Firebase User
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const fbUser = userCredential.user;
 
-    // 2. Update display name in Firebase
     if (displayName) {
       await updateProfile(fbUser, { displayName });
     }
 
-    let userObj = buildUserObject({
-      ...fbUser,
-      displayName: displayName || fbUser.displayName
-    });
     localStorage.setItem('gosh_terms_accepted', 'true');
     setTermsAccepted(true);
-    setUser(userObj);
-    setProfile(userObj);
-    localStorage.setItem('gosh_saved_user', JSON.stringify(userObj));
-    localStorage.setItem('gosh_saved_profile', JSON.stringify(userObj));
 
-    // 3. Register user in Supabase & Backend
-    try {
-      const syncRes = await api.syncUser({
-        firebaseUid: fbUser.uid,
-        email,
-        displayName: displayName || email.split('@')[0],
-        username: username?.trim() || email.split('@')[0],
-        mobile_number: mobile?.trim() || null,
-        email_verified: true
-      });
-      if (syncRes && syncRes.user) {
-        userObj = buildUserObject(fbUser, syncRes.user, syncRes.profile);
-        setUser(userObj);
-        setProfile(userObj);
-        localStorage.setItem('gosh_saved_user', JSON.stringify(userObj));
-        localStorage.setItem('gosh_saved_profile', JSON.stringify(userObj));
+    const synced = await syncWithBackend(fbUser, {
+      displayName: displayName || email.split('@')[0],
+      username: username?.trim() || null,
+      mobile_number: mobile?.trim() || null
+    });
+
+    if (!synced.ok) {
+      if (synced.syncRes?.status === 409) {
+        throw new Error(synced.error);
       }
-    } catch (syncErr) {
-      console.warn('Backend sync deferred or offline:', syncErr?.message || syncErr);
+      const fallbackObj = buildUserObject({
+        ...fbUser,
+        displayName: displayName || fbUser.displayName
+      });
+      persistSessionState(fallbackObj, fallbackObj);
+      return fallbackObj;
     }
 
-    socketService.connect(userObj);
-    encryptionService.initUserKeys(userObj.id).catch(console.warn);
-    return userObj;
+    return synced.userObj;
   };
 
-  // Logout
   const logout = async () => {
     try {
       await signOut(auth);
-    } catch (e) {
-      // Firebase might not be signed in if logged in via direct OTP
+    } catch {
+      // Ignore if OTP session only
     }
     localStorage.removeItem('gosh_jwt_token');
     localStorage.removeItem('gosh_saved_user');
     localStorage.removeItem('gosh_saved_profile');
+    setSyncError(null);
     socketService.disconnect();
     setUser(null);
     setProfile(null);
   };
 
-  // Reset password
   const resetPassword = async (identifier) => {
     let emailToUse = identifier.trim();
     if (!identifier.includes('@')) {
@@ -366,19 +312,19 @@ export const AuthProvider = ({ children }) => {
     return emailToUse;
   };
 
-  // Refresh profile
+  const retryBackendSync = async () => {
+    if (auth?.currentUser) {
+      return syncWithBackend(auth.currentUser);
+    }
+    return { ok: false, error: 'No active Firebase user.' };
+  };
+
   const refreshProfile = async () => {
-    if (user?.id) {
+    if (user?.id && UUID_REGEX.test(user.id)) {
       const res = await api.getProfile(user.id);
-      if (res.profile) {
-        setProfile(res.profile);
-        setUser(prev => ({
-          ...prev,
-          displayName: res.profile.display_name,
-          avatarUrl: res.profile.avatar_url,
-          bio: res.profile.bio,
-          relationshipStatus: res.profile.relationship_status
-        }));
+      if (res?.success && res.profile) {
+        const updatedUser = buildUserObject(auth?.currentUser, res.user, res.profile);
+        persistSessionState(updatedUser, res.profile);
       }
     }
   };
@@ -388,6 +334,8 @@ export const AuthProvider = ({ children }) => {
       user,
       profile,
       loading,
+      syncError,
+      retryBackendSync,
       termsAccepted,
       acceptTerms,
       login,

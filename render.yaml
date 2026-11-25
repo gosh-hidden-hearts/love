@@ -7,6 +7,7 @@ services:
     rootDir: backend
     buildCommand: npm install
     startCommand: npm start
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
@@ -14,22 +15,26 @@ services:
         value: 10000
       - key: SUPABASE_URL
         value: https://azwclorwxrzgofmribms.supabase.co
-      - key: SUPABASE_KEY
-        value: sb_publishable_TzJoKCD-cPN6JLbgB_5K5g_H2nkq8YW
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false # REQUIRED: Set in Render Dashboard from Supabase Settings -> API -> service_role
+      - key: FIREBASE_PROJECT_ID
+        value: gosh-81416
+      - key: CORS_ORIGIN
+        value: https://gosh-hidden-hearts.github.io
       - key: SMTP_HOST
         value: smtp.gmail.com
       - key: SMTP_PORT
         value: "587"
       - key: SMTP_USER
-        value: gosh81416@gmail.com
+        sync: false # Set in Render Dashboard
       - key: SMTP_PASS
-        sync: false # Set in Render Dashboard: your-gmail-app-password
+        sync: false # Set in Render Dashboard: Gmail App Password
       - key: SMTP_FROM
         value: '"GOSH Sanctuary" <gosh81416@gmail.com>'
       - key: MEGA_EMAIL
-        value: gosh81416@gmail.com
+        sync: false # Set in Render Dashboard
       - key: MEGA_PASSWORD
-        sync: false # Set in Render Dashboard: your-mega-password
+        sync: false # Set in Render Dashboard
       - key: JWT_SECRET
         generateValue: true
       - key: OTP_EXPIRY_MINUTES

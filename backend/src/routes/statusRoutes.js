@@ -3,6 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import statusController from '../controllers/statusController.js';
+import { authenticateToken } from '../middleware/authMiddleware.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,9 +17,9 @@ const upload = multer({ storage });
 
 const router = Router();
 
-router.get('/', statusController.getStatuses);
-router.post('/', upload.single('media'), statusController.createStatus);
-router.post('/:statusId/view', statusController.markViewed);
-router.delete('/:statusId', statusController.deleteStatus);
+router.get('/', authenticateToken, statusController.getStatuses);
+router.post('/', authenticateToken, upload.single('media'), statusController.createStatus);
+router.post('/:statusId/view', authenticateToken, statusController.markViewed);
+router.delete('/:statusId', authenticateToken, statusController.deleteStatus);
 
 export default router;

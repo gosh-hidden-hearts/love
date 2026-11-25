@@ -62,39 +62,13 @@ export default function StatusPage() {
 
   const loadStatuses = async () => {
     try {
-      const res = await api.getStatuses(user?.id);
+      const res = await api.getStatuses();
       if (res.statuses) {
         setStatuses(res.statuses);
         setMyStatuses(res.myStatuses || []);
       } else {
-        // Romantic demo stories
-        const demoStories = [
-          {
-            id: 'status-1',
-            userId: 'partner-1',
-            userName: 'Soul Connection ✨',
-            userAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-            type: 'text',
-            content: 'Under the same sky, forever thinking of you 🌌✨',
-            gradient: 'from-purple-900 to-rose-900',
-            createdAt: new Date().toISOString(),
-            viewsCount: 4,
-            viewers: ['Maya Ross', 'Alexander', 'Elena', 'Soul Connection']
-          },
-          {
-            id: 'status-2',
-            userId: 'partner-2',
-            userName: 'Juliet 🌹',
-            userAvatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
-            type: 'media',
-            mediaUrl: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=800&auto=format&fit=crop&q=80',
-            caption: 'Our favorite coffee spot from our first walk ☕❤️',
-            createdAt: new Date(Date.now() - 3600000 * 3).toISOString(),
-            viewsCount: 9,
-            viewers: ['You', 'Noah', 'Sophia']
-          }
-        ];
-        setStatuses(demoStories);
+        setStatuses([]);
+        setMyStatuses([]);
       }
     } catch (e) {
       console.warn(e);
@@ -151,12 +125,16 @@ export default function StatusPage() {
         : `"${activeStoryViewer.content?.slice(0, 35)}..."`;
       const replyMessage = `❤️ Replied to your status (${summary}):\n${replyText.trim()}`;
 
-      await api.sendMessage({
-        senderId: user?.id,
-        receiverId: activeStoryViewer.userId,
+      const res = await api.sendMessage({
+        targetUserId: activeStoryViewer.userId,
         content: replyMessage,
         messageType: 'text'
       });
+
+      if (!res?.success) {
+        alert(res?.message || 'Could not send status reply.');
+        return;
+      }
 
       setReplyText('');
       setActiveStoryViewer(null);
@@ -217,25 +195,13 @@ export default function StatusPage() {
         }
       }
 
-      await api.createStatus(formData);
+      const res = await api.createStatus(formData);
+      if (!res?.success || !res?.status) {
+        alert(res?.message || 'Could not post status update.');
+        return;
+      }
 
-      // Local optimistic update
-      const newStatus = {
-        id: 'status-' + Date.now(),
-        userId: user?.id,
-        userName: 'My Status',
-        userAvatar: user?.avatarUrl,
-        type: statusType,
-        content: textContent,
-        gradient: selectedGradient,
-        mediaUrl: mediaPreview,
-        caption,
-        createdAt: new Date().toISOString(),
-        viewsCount: 0,
-        viewers: []
-      };
-
-      setMyStatuses((prev) => [newStatus, ...prev]);
+      setMyStatuses((prev) => [res.status, ...prev]);
       setShowCreateModal(false);
       setTextContent('');
       setMediaFile(null);

@@ -1,25 +1,37 @@
 import db from '../repositories/databaseRepository.js';
 
 export const conversationController = {
-  // Get all direct & group conversations for user
+  // Get all direct & group conversations for authenticated user
   async getConversations(req, res) {
     try {
-      const { userId } = req.query;
-      const convs = await db.getConversationsForUser(userId);
+      const convs = await db.getConversationsForUser(req.user.id);
       return res.json({ success: true, conversations: convs });
     } catch (err) {
       return res.status(500).json({ success: false, message: err.message });
     }
   },
 
-  // Create direct conversation
+  // Create or return existing direct conversation
   async createConversation(req, res) {
     try {
-      const { partnerId, name, avatarUrl, creatorId } = req.body;
-      const actualCreatorId = req.user?.id || creatorId;
+      const { partnerId, name, avatarUrl } = req.body;
+      const actualCreatorId = req.user.id;
 
-      if (!actualCreatorId || !partnerId) {
-        return res.status(400).json({ success: false, message: 'Creator and partner IDs are required.' });
+      if (!partnerId) {
+        return res.status(400).json({ success: false, message: 'Partner ID is required.' });
+      }
+
+      if (actualCreatorId === partnerId) {
+        return res.status(400).json({ success: false, message: 'Cannot start a direct chat with yourself.' });
+      }
+
+      const isBlocked = await db.isUserBlocked(actualCreatorId, partnerId);
+      if (isBlocked) {
+        return res.status(403).json({
+          success: false,
+          code: 'USER_BLOCKED',
+          message: 'Messaging unavailable: One of the users has blocked the other.'
+        });
       }
 
       // Enforce: User can only initiate a conversation with someone saved in their contacts
@@ -38,8 +50,9 @@ export const conversationController = {
         name,
         avatarUrl,
         creatorId: actualCreatorId,
-        members: [actualCreatorId, partnerId].filter(Boolean)
+        members: [actualCreatorId, partnerId]
       });
+
       return res.json({ success: true, conversation: conv });
     } catch (err) {
       return res.status(500).json({ success: false, message: err.message });
@@ -49,7 +62,8 @@ export const conversationController = {
   // Create group conversation
   async createGroup(req, res) {
     try {
-      const { name, description, avatarUrl, creatorId, members } = req.body;
+      const { name, description, avatarUrl, members } = req.body;
+      const creatorId = req.user.id;
       if (!name) {
         return res.status(400).json({ success: false, message: 'Group name is required.' });
       }
@@ -57,11 +71,10 @@ export const conversationController = {
       const allMembers = Array.from(new Set([creatorId, ...(members || [])].filter(Boolean)));
 
       const groupConv = await db.createConversation({
-        id: 'group-' + Date.now(),
         type: 'group',
         name,
         description: description || 'Romantic Soul Group ✨',
-        avatarUrl: avatarUrl || `https://api.dicebear.com/7.x/shapes/svg?seed=${name}`,
+        avatarUrl: avatarUrl || `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(name)}`,
         creatorId,
         members: allMembers,
         lastMessageText: `Group "${name}" was created`

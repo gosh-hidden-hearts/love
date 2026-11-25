@@ -4,8 +4,7 @@ import megaStorageService from '../services/megaStorageService.js';
 export const memoryVaultController = {
   async getMemories(req, res) {
     try {
-      const { userId } = req.query;
-      const memories = await db.getMemories(userId);
+      const memories = await db.getMemories(req.user.id);
       return res.json({ success: true, memories });
     } catch (err) {
       return res.status(500).json({ success: false, message: err.message });
@@ -14,14 +13,14 @@ export const memoryVaultController = {
 
   async uploadMemory(req, res) {
     try {
-      const { uploaderId, uploaderName, caption, memoryDate, feelingsTag, album, fileType } = req.body;
+      const { uploaderName, caption, memoryDate, feelingsTag, album, fileType } = req.body;
       const file = req.file;
+      const uploaderId = req.user.id;
 
       if (!file) {
         return res.status(400).json({ success: false, message: 'No file provided for upload.' });
       }
 
-      // Stream file directly to MEGA Cloud Storage
       let megaResult = null;
       try {
         megaResult = await megaStorageService.uploadFile(file.buffer, file.originalname, file.mimetype, 'GOSH_Memories');
@@ -34,8 +33,7 @@ export const memoryVaultController = {
         };
       }
 
-      const memoryRecord = {
-        id: 'mem-' + Date.now(),
+      const saved = await db.saveMemory({
         fileName: file.originalname,
         fileType: fileType || 'document',
         fileSize: file.size,
@@ -48,13 +46,10 @@ export const memoryVaultController = {
         feelingsTag,
         album: album || 'All Memories',
         uploaderId,
-        uploaderName: uploaderName || 'Soul Partner',
-        createdAt: new Date().toISOString()
-      };
+        uploaderName: uploaderName || req.user.username || 'Soul Partner'
+      });
 
-      await db.saveMemory(memoryRecord);
-
-      return res.json({ success: true, memory: memoryRecord });
+      return res.json({ success: true, memory: saved });
     } catch (err) {
       console.error('Upload Memory Error:', err);
       return res.status(500).json({ success: false, message: 'Memory upload failed: ' + err.message });
@@ -65,10 +60,13 @@ export const memoryVaultController = {
     try {
       const { memoryId } = req.params;
       const mem = await db.getMemoryById(memoryId);
+      if (mem && mem.uploaderId !== req.user.id) {
+        return res.status(403).json({ success: false, message: 'Forbidden: You can only delete your own memories.' });
+      }
       if (mem?.megaFileHandle && typeof mem.megaFileHandle === 'string' && !mem.megaFileHandle.startsWith('local-')) {
         megaStorageService.deleteFile(mem.megaFileHandle).catch(console.warn);
       }
-      await db.deleteMemory(memoryId);
+      await db.deleteMemory(memoryId, req.user.id);
       return res.json({ success: true });
     } catch (err) {
       return res.status(500).json({ success: false, message: err.message });

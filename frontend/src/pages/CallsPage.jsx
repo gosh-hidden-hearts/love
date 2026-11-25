@@ -32,46 +32,11 @@ export default function CallsPage() {
 
   const loadCallHistory = async () => {
     try {
-      const res = await api.getCallHistory(user?.id);
+      const res = await api.getCallHistory();
       if (res.calls && res.calls.length > 0) {
         setCallLogs(res.calls);
       } else {
-        // Romantic demo logs
-        setCallLogs([
-          {
-            id: 'call-1',
-            callerId: 'partner-1',
-            partnerName: 'Soul Heart Partner ✨',
-            partnerAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-            callType: 'video',
-            direction: 'incoming',
-            status: 'connected',
-            durationSeconds: 1420, // 23 mins
-            createdAt: new Date(Date.now() - 3600000 * 2).toISOString()
-          },
-          {
-            id: 'call-2',
-            callerId: user?.id,
-            partnerName: 'Soul Heart Partner ✨',
-            partnerAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-            callType: 'audio',
-            direction: 'outgoing',
-            status: 'connected',
-            durationSeconds: 310,
-            createdAt: new Date(Date.now() - 3600000 * 26).toISOString()
-          },
-          {
-            id: 'call-3',
-            callerId: 'partner-1',
-            partnerName: 'Soul Heart Partner ✨',
-            partnerAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-            callType: 'video',
-            direction: 'incoming',
-            status: 'missed',
-            durationSeconds: 0,
-            createdAt: new Date(Date.now() - 3600000 * 48).toISOString()
-          }
-        ]);
+        setCallLogs([]);
       }
     } catch (err) {
       console.warn(err);
@@ -80,9 +45,9 @@ export default function CallsPage() {
 
   const loadContacts = async () => {
     try {
-      const res = await api.searchUsers('');
-      if (res.users) {
-        setContacts(res.users);
+      const res = await api.getContacts();
+      if (res.contacts) {
+        setContacts(res.contacts);
       }
     } catch (e) {
       console.warn(e);
@@ -260,19 +225,23 @@ export default function CallsPage() {
 
             <div className="space-y-2 max-h-72 overflow-y-auto">
               {contacts.length > 0 ? (
-                contacts.map((c) => (
+                contacts.map((c) => {
+                  const targetId = c.userId || c.id;
+                  const targetName = c.nickname || c.displayName || c.display_name || c.username;
+                  const targetAvatar = c.avatarUrl || c.avatar_url || `https://api.dicebear.com/7.x/adventurer/svg?seed=${targetId}`;
+                  return (
                   <div
-                    key={c.id}
+                    key={targetId}
                     className="p-3 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-between"
                   >
                     <div className="flex items-center gap-3">
                       <img
-                        src={c.avatar_url || `https://api.dicebear.com/7.x/adventurer/svg?seed=${c.id}`}
-                        alt={c.display_name}
+                        src={targetAvatar}
+                        alt={targetName}
                         className="w-10 h-10 rounded-full object-cover border border-white/10"
                       />
                       <div>
-                        <h4 className="text-xs font-semibold text-white">{c.display_name}</h4>
+                        <h4 className="text-xs font-semibold text-white">{targetName}</h4>
                         <p className="text-[10px] text-slate-400">@{c.username || 'user'}</p>
                       </div>
                     </div>
@@ -282,9 +251,9 @@ export default function CallsPage() {
                         onClick={() => {
                           setShowNewCallModal(false);
                           startCall({
-                            receiverId: c.id,
-                            receiverName: c.display_name,
-                            receiverAvatar: c.avatar_url,
+                            receiverId: targetId,
+                            receiverName: targetName,
+                            receiverAvatar: targetAvatar,
                             type: 'audio'
                           });
                         }}
@@ -296,9 +265,9 @@ export default function CallsPage() {
                         onClick={() => {
                           setShowNewCallModal(false);
                           startCall({
-                            receiverId: c.id,
-                            receiverName: c.display_name,
-                            receiverAvatar: c.avatar_url,
+                            receiverId: targetId,
+                            receiverName: targetName,
+                            receiverAvatar: targetAvatar,
                             type: 'video'
                           });
                         }}
@@ -308,7 +277,8 @@ export default function CallsPage() {
                       </button>
                     </div>
                   </div>
-                ))
+                );
+                })
               ) : (
                 <div className="p-4 text-center text-xs text-slate-400">
                   No other contacts registered yet. Use search in Chats to add them!

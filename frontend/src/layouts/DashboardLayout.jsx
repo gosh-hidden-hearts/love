@@ -34,7 +34,7 @@ import logoImg from '../assets/logo.png';
 export default function DashboardLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, profile, logout, isVaultLocked } = useAuth();
+  const { user, profile, syncError, retryBackendSync, logout, isVaultLocked } = useAuth();
   const { 
     callActive, 
     incomingCall, 
@@ -228,6 +228,29 @@ export default function DashboardLayout() {
             </button>
           </div>
         </header>
+
+        {/* Supabase / Backend Sync Warning Banner */}
+        {syncError && (
+          <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 text-xs text-amber-200 flex flex-wrap items-center justify-between gap-2 z-30">
+            <span>
+              ⚠️ Database sync paused: {syncError}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={retryBackendSync}
+                className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-100 font-medium transition"
+              >
+                Retry Sync
+              </button>
+              <button
+                onClick={() => navigate('/settings')}
+                className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 font-medium transition"
+              >
+                Backend Settings
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Page Content Outlet */}
         <div className="flex-1 overflow-hidden relative min-w-0 max-w-full">

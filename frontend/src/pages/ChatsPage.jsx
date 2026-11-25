@@ -109,23 +109,30 @@ export default function ChatsPage() {
       }
 
       if (activeConversation && (msg.conversationId === activeConversation.id || msg.senderId === activeConversation.partnerId)) {
-        setMessages((prev) => [...prev, processedMsg]);
+        setMessages((prev) =>
+          prev.some((m) => m.id === processedMsg.id) ? prev : [...prev, processedMsg]
+        );
         scrollToBottom();
       }
 
-      // Update last message in conversation list
-      setConversations((prev) => 
-        prev.map((c) => 
-          c.id === msg.conversationId || c.partnerId === msg.senderId 
-            ? { 
-                ...c, 
-                lastMessageText: processedMsg.content || 'Media message', 
-                lastMessageAt: msg.createdAt, 
-                unreadCount: c.id === activeConversation?.id ? 0 : (c.unreadCount || 0) + 1 
+      // Update last message in conversation list or reload if this is a brand new conversation
+      setConversations((prev) => {
+        const exists = prev.some((c) => c.id === msg.conversationId || c.partnerId === msg.senderId);
+        if (!exists) {
+          loadConversations();
+          return prev;
+        }
+        return prev.map((c) =>
+          c.id === msg.conversationId || c.partnerId === msg.senderId
+            ? {
+                ...c,
+                lastMessageText: processedMsg.content || 'Media message',
+                lastMessageAt: msg.createdAt,
+                unreadCount: c.id === activeConversation?.id ? 0 : (c.unreadCount || 0) + 1
               }
             : c
-        )
-      );
+        );
+      });
     };
 
     const handlePartnerTyping = (data) => {
@@ -177,7 +184,7 @@ export default function ChatsPage() {
   // Helper: check if a target user is in user's saved contacts
   const isUserSavedContact = (targetUserId) => {
     if (!targetUserId) return false;
-    if (targetUserId === 'partner-demo' || targetUserId === user?.id) return true;
+    if (targetUserId === user?.id) return true;
     return contacts.some((c) => c.userId === targetUserId);
   };
 
@@ -191,36 +198,21 @@ export default function ChatsPage() {
   const isCurrentChatPermitted = () => {
     if (!activeConversation) return false;
     if (activeConversation.isGroup || activeConversation.is_group) return true;
-    if (!activeConversation.partnerId || activeConversation.partnerId === 'partner-demo') return true;
+    if (!activeConversation.partnerId) return false;
     return isUserSavedContact(activeConversation.partnerId);
   };
 
-  // Load conversations
+  // Load conversations from Supabase via backend
   const loadConversations = async () => {
     try {
-      const res = await api.getConversations(user?.id);
+      const res = await api.getConversations();
       if (res.conversations && res.conversations.length > 0) {
         setConversations(res.conversations);
         if (!activeConversation && window.innerWidth >= 768) {
           selectConversation(res.conversations[0]);
         }
       } else {
-        // Provide romantic starter conversation if completely empty
-        const defaultPartner = {
-          id: 'partner-demo',
-          partnerId: 'partner-demo',
-          name: 'Soul Heart Partner ✨',
-          avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-          online: true,
-          lastSeen: 'Online',
-          lastMessageText: 'Welcome to our private sanctuary on GOSH ❤️',
-          lastMessageAt: new Date().toISOString(),
-          unreadCount: 1
-        };
-        setConversations([defaultPartner]);
-        if (!activeConversation && window.innerWidth >= 768) {
-          selectConversation(defaultPartner);
-        }
+        setConversations([]);
       }
     } catch (e) {
       console.warn('Error loading conversations:', e);
@@ -246,17 +238,7 @@ export default function ChatsPage() {
         );
         setMessages(decryptedList);
       } else {
-        // Default warm greeting
-        setMessages([
-          {
-            id: 'init-msg-1',
-            senderId: conv.partnerId || 'partner-demo',
-            content: 'Welcome to GOSH! This is your safe, private sanctuary where every word is protected and every memory is cherished. 🌹',
-            createdAt: new Date().toISOString(),
-            deliveryStatus: 'read',
-            messageType: 'text'
-          }
-        ]);
+        setMessages([]);
       }
     } catch (err) {
       console.error(err);
@@ -309,9 +291,14 @@ export default function ChatsPage() {
       return;
     }
 
+    const clientMsgId =
+      typeof window !== 'undefined' && window.crypto?.randomUUID
+        ? window.crypto.randomUUID()
+        : 'msg-' + Date.now();
+
     const newMsg = {
-      id: 'msg-' + Date.now(),
-      conversationId: activeConversation?.id || 'conv-default',
+      id: clientMsgId,
+      conversationId: activeConversation?.id,
       senderId: user?.id,
       senderName: user?.displayName,
       replyToId: replyingTo?.id || null,
@@ -352,25 +339,35 @@ export default function ChatsPage() {
       targetUserId: activeConversation?.partnerId
     };
 
-    // Emit over WebSocket for instant delivery
-    socketService.emit('send_message', wirePayload);
-
-    // Persist via backend API with error catch
+    // Persist to Supabase via backend API first
     try {
       const res = await api.sendMessage(wirePayload);
-      if (res && res.code === 'NOT_A_CONTACT') {
-        // Rollback optimistic message on contact authorization failure
-        setMessages((prev) => prev.filter((m) => m.id !== newMsg.id));
-        setContactErrorNotice(res.message || 'Message blocked: You can only message users saved in your contacts.');
+      if (!res?.success) {
+        setMessages((prev) => prev.filter((m) => m.id !== clientMsgId));
+        setContactErrorNotice(res?.message || 'Could not save message to Supabase.');
         setTimeout(() => setContactErrorNotice(''), 6000);
+        return;
       }
+
+      // Emit over WebSocket after DB persistence succeeds
+      socketService.emit('send_message', {
+        ...wirePayload,
+        id: res.message?.id || clientMsgId,
+        createdAt: res.message?.createdAt || newMsg.createdAt
+      });
+
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === activeConversation?.id
+            ? { ...c, lastMessageText: textToSend || 'Media message', lastMessageAt: newMsg.createdAt }
+            : c
+        )
+      );
     } catch (err) {
       console.error('Failed to save message to database:', err);
-      if (err.message?.includes('contact') || err.message?.includes('NOT_A_CONTACT')) {
-        setMessages((prev) => prev.filter((m) => m.id !== newMsg.id));
-        setContactErrorNotice('Contact authorization error: You can only message saved contacts.');
-        setTimeout(() => setContactErrorNotice(''), 6000);
-      }
+      setMessages((prev) => prev.filter((m) => m.id !== clientMsgId));
+      setContactErrorNotice(err.message || 'Failed to save message to database.');
+      setTimeout(() => setContactErrorNotice(''), 6000);
     }
   };
 
@@ -402,77 +399,84 @@ export default function ChatsPage() {
     }
   };
 
-  // Start chat with a saved contact
+  // Start chat with a saved contact (uses canonical Supabase conversation UUID)
   const handleStartChatWithContact = async (contact) => {
-    // Check if conversation already exists
-    const existingConv = conversations.find(
-      (c) => c.partnerId === contact.userId || c.id === `conv-${contact.userId}`
-    );
-
+    const existingConv = conversations.find((c) => !c.isGroup && c.partnerId === contact.userId);
     if (existingConv) {
       selectConversation(existingConv);
       setFilterTab('all');
       return;
     }
 
-    // Create or initialize conversation
-    const newConv = {
-      id: 'conv-' + contact.userId,
-      partnerId: contact.userId,
-      name: contact.nickname || contact.displayName || contact.username,
-      avatarUrl: contact.avatarUrl || `https://api.dicebear.com/7.x/adventurer/svg?seed=${contact.userId}`,
-      online: Boolean(contact.onlineStatus),
-      lastSeen: contact.onlineStatus ? 'Online' : contact.lastSeen || 'Recently active',
-      lastMessageText: 'Say hi! 💕',
-      lastMessageAt: new Date().toISOString(),
-      unreadCount: 0
-    };
+    const displayName = contact.nickname || contact.displayName || contact.username;
+    const avatarUrl = contact.avatarUrl || `https://api.dicebear.com/7.x/adventurer/svg?seed=${contact.userId}`;
 
     try {
-      await api.createConversation({
+      const res = await api.createConversation({
         partnerId: contact.userId,
-        name: newConv.name,
-        avatarUrl: newConv.avatarUrl,
-        creatorId: user.id
+        name: displayName,
+        avatarUrl
       });
+
+      if (!res?.success || !res?.conversation) {
+        setContactErrorNotice(res?.message || 'Unable to start conversation.');
+        setTimeout(() => setContactErrorNotice(''), 6000);
+        return;
+      }
+
+      const createdConv = {
+        ...res.conversation,
+        name: displayName,
+        avatarUrl,
+        online: Boolean(contact.onlineStatus),
+        lastSeen: contact.onlineStatus ? 'Online' : contact.lastSeen || 'Recently active'
+      };
+
+      setConversations((prev) => [createdConv, ...prev.filter((c) => c.id !== createdConv.id)]);
+      selectConversation(createdConv);
+      setFilterTab('all');
     } catch (e) {
       console.warn('Backend create conversation note:', e);
+      setContactErrorNotice(e.message || 'Could not create conversation.');
     }
-
-    setConversations((prev) => [newConv, ...prev.filter((c) => c.partnerId !== contact.userId)]);
-    selectConversation(newConv);
-    setFilterTab('all');
   };
 
-  // Start chat with user object
+  // Start chat with user object (uses canonical Supabase conversation UUID)
   const handleStartChatWithUser = async (targetUser, nickname = '') => {
-    const displayName = nickname || targetUser.display_name || targetUser.username;
-    const newConv = {
-      id: 'conv-' + targetUser.id,
-      partnerId: targetUser.id,
-      name: displayName,
-      avatarUrl: targetUser.avatar_url || `https://api.dicebear.com/7.x/adventurer/svg?seed=${targetUser.id}`,
-      online: Boolean(targetUser.online_status),
-      lastSeen: targetUser.online_status ? 'Online' : 'Recently seen',
-      lastMessageText: 'Say hi! 💕',
-      lastMessageAt: new Date().toISOString(),
-      unreadCount: 0
-    };
+    const displayName = nickname || targetUser.displayName || targetUser.display_name || targetUser.username;
+    const avatarUrl =
+      targetUser.avatarUrl ||
+      targetUser.avatar_url ||
+      `https://api.dicebear.com/7.x/adventurer/svg?seed=${targetUser.id}`;
 
     try {
-      await api.createConversation({
+      const res = await api.createConversation({
         partnerId: targetUser.id,
-        name: newConv.name,
-        avatarUrl: newConv.avatarUrl,
-        creatorId: user.id
+        name: displayName,
+        avatarUrl
       });
+
+      if (!res?.success || !res?.conversation) {
+        setContactErrorNotice(res?.message || 'Unable to create conversation.');
+        setTimeout(() => setContactErrorNotice(''), 6000);
+        return;
+      }
+
+      const createdConv = {
+        ...res.conversation,
+        name: displayName,
+        avatarUrl,
+        online: Boolean(targetUser.onlineStatus ?? targetUser.online_status),
+        lastSeen: (targetUser.onlineStatus ?? targetUser.online_status) ? 'Online' : 'Recently seen'
+      };
+
+      setConversations((prev) => [createdConv, ...prev.filter((c) => c.id !== createdConv.id)]);
+      selectConversation(createdConv);
+      setShowNewChatModal(false);
     } catch (e) {
       console.warn('Backend create conversation note:', e);
+      setContactErrorNotice(e.message || 'Could not create conversation.');
     }
-
-    setConversations((prev) => [newConv, ...prev.filter((c) => c.partnerId !== targetUser.id)]);
-    selectConversation(newConv);
-    setShowNewChatModal(false);
   };
 
   // Rename contact nickname
@@ -1115,7 +1119,7 @@ export default function ChatsPage() {
                       return;
                     }
                     startCall({
-                      receiverId: activeConversation.partnerId || 'partner-demo',
+                      receiverId: activeConversation.partnerId,
                       receiverName: activeConversation.name,
                       receiverAvatar: activeConversation.avatarUrl,
                       type: 'audio'
@@ -1135,7 +1139,7 @@ export default function ChatsPage() {
                       return;
                     }
                     startCall({
-                      receiverId: activeConversation.partnerId || 'partner-demo',
+                      receiverId: activeConversation.partnerId,
                       receiverName: activeConversation.name,
                       receiverAvatar: activeConversation.avatarUrl,
                       type: 'video'
@@ -1184,7 +1188,7 @@ export default function ChatsPage() {
                           <span>Remove from Contacts</span>
                         </button>
                       </>
-                    ) : !activeConversation.isGroup && activeConversation.partnerId && activeConversation.partnerId !== 'partner-demo' ? (
+                    ) : !activeConversation.isGroup && activeConversation.partnerId ? (
                       <button
                         onClick={() => {
                           setShowChatOptions(false);
@@ -1716,12 +1720,12 @@ export default function ChatsPage() {
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                               <img
-                                src={usr.avatar_url || `https://api.dicebear.com/7.x/adventurer/svg?seed=${usr.id}`}
-                                alt={usr.display_name}
+                                src={usr.avatarUrl || usr.avatar_url || `https://api.dicebear.com/7.x/adventurer/svg?seed=${usr.id}`}
+                                alt={usr.displayName || usr.display_name || usr.username}
                                 className="w-10 h-10 rounded-full object-cover border border-rose-500/30 bg-[#08090e]"
                               />
                               <div>
-                                <h4 className="text-xs font-semibold text-white">{usr.display_name}</h4>
+                                <h4 className="text-xs font-semibold text-white">{usr.displayName || usr.display_name || usr.username}</h4>
                                 <p className="text-[10px] text-slate-400">@{usr.username || 'user'}</p>
                               </div>
                             </div>
